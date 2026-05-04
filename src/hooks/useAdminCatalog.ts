@@ -1,0 +1,998 @@
+"use client";
+
+import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+  type ChangeEvent,
+  type FormEvent,
+} from "react";
+import { useRouter } from "next/navigation";
+import { type Auth, onIdTokenChanged, signOut } from "firebase/auth";
+import type { AdminTab } from "@/components/admin/AdminTabs";
+import type {
+  Category,
+  CategoryFormState,
+  ErrorResponseBody,
+  ProductImageAsset,
+  Product,
+  ProductFormState,
+  ProductVariantFormState,
+} from "@/types/domain";
+import {
+  isAdminCatalogPayload,
+  isCategory,
+  isProduct,
+} from "@/lib/catalog/contracts";
+import { isErrorWithMessage, isRecord } from "@/types/shared";
+import {
+  MAX_PRODUCT_IMAGE_COUNT,
+  MAX_PRODUCT_IMAGE_SIZE_BYTES,
+} from "@/lib/catalog/constants";
+import { getFirebaseClientAuth } from "@/lib/firebase/auth";
+import {
+  authorizedFetch,
+  clearAdminSession,
+  getAdminSession,
+  persistAdminSession,
+} from "@/lib/admin/client";
+
+function normalizeText(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function getResponseErrorMessage(payload: unknown, fallback: string): string {
+  if (isRecord(payload) && typeof payload.error === "string") {
+    return payload.error;
+  }
+
+  return fallback;
+}
+
+function toTimestamp(value: string | null): number {
+  if (!value) {
+    return 0;
+  }
+
+  const parsed = new Date(value).getTime();
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function sortCategories(categories: Category[]): Category[] {
+  return [...categories].sort((left, right) =>
+    left.nombre_categoria.localeCompare(right.nombre_categoria, "es")
+  );
+}
+
+function sortProducts(products: Product[]): Product[] {
+  return [...products].sort(
+    (left, right) =>
+      toTimestamp(right.updated_at ?? right.created_at) -
+      toTimestamp(left.updated_at ?? left.created_at)
+  );
+}
+
+function upsertCategory(categories: Category[], nextCategory: Category): Category[] {
+  const withoutCurrent = categories.filter(
+    (category) => category.id_categoria !== nextCategory.id_categoria
+  );
+  return sortCategories([...withoutCurrent, nextCategory]);
+}
+
+function upsertProduct(products: Product[], nextProduct: Product): Product[] {
+  const withoutCurrent = products.filter(
+    (product) => product.id_producto !== nextProduct.id_producto
+  );
+  return sortProducts([...withoutCurrent, nextProduct]);
+}
+
+async function parseJson<T>(response: Response): Promise<T> {
+  return (await response.json()) as T;
+}
+
+function isSameFile(left: File, right: File): boolean {
+  return (
+    left.name === right.name &&
+    left.size === right.size &&
+    left.lastModified === right.lastModified
+  );
+}
+
+interface UseAdminCatalogResult {
+  booting: boolean;
+  activeTab: AdminTab;
+  setActiveTab: (value: string) => void;
+  sessionEmail: string;
+  error: string;
+  notice: string;
+  categories: Category[];
+  products: Product[];
+  filteredProducts: Product[];
+  productFilter: string;
+  setProductFilter: (value: string) => void;
+  editingCategoryId: string;
+  editingProductId: string;
+  existingProductImages: ProductImageAsset[];
+  imagePreviews: string[];
+  isPending: boolean;
+  categorySubmitting: boolean;
+  productSubmitting: boolean;
+  deleteDialogOpen: boolean;
+  deleteDialogType: "category" | "product" | null;
+  deleteDialogLabel: string;
+  deleteDialogError: string;
+  deleteSubmitting: boolean;
+  categoryForm: CategoryFormState;
+  productForm: ProductFormState;
+  updateCategoryField: (field: keyof CategoryFormState, value: string) => void;
+  updateProductField: (
+    field: keyof ProductFormState,
+    value: string | File[] | ProductVariantFormState[] | null
+  ) => void;
+  updateProductVariantField: (
+    index: number,
+    field: keyof ProductVariantFormState,
+    value: string
+  ) => void;
+  handleImageChange: (event: ChangeEvent<HTMLInputElement>) => void;
+  appendImageFiles: (files: File[]) => void;
+  setPrimarySelectedImage: (index: number) => void;
+  setPrimaryExistingImage: (index: number) => void;
+  removeExistingImage: (index: number) => void;
+  clearSelectedImages: () => void;
+  resetCategoryForm: () => void;
+  resetProductForm: () => void;
+  beginCategoryEdit: (category: Category) => void;
+  beginProductEdit: (product: Product) => void;
+  submitCategory: (event: FormEvent<HTMLFormElement>) => void;
+  submitProduct: (event: FormEvent<HTMLFormElement>) => void;
+  requestCategoryDelete: (category: Category) => void;
+  requestProductDelete: (product: Product) => void;
+  closeDeleteDialog: () => void;
+  confirmDelete: () => void;
+  logout: () => void;
+}
+
+interface DeleteTarget {
+  kind: "category" | "product";
+  id: string;
+  label: string;
+}
+
+const EMPTY_CATEGORY_FORM: CategoryFormState = {
+  nombre_categoria: "",
+  slug: "",
+};
+
+const EMPTY_PRODUCT_FORM: ProductFormState = {
+  nombre: "",
+  descripcion: "",
+  precio: "",
+  precio_promocional: "",
+  id_categoria: "",
+  stock: "",
+  tag: "",
+  tipo_medida: "none",
+  medidas: "",
+  variantes: [],
+  imagenes: [],
+};
+
+function normalizeVariantMeasures(value: string): string[] {
+  const seen = new Set<string>();
+
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item) => {
+      if (!item) {
+        return false;
+      }
+
+      const normalized = item.toLowerCase();
+
+      if (seen.has(normalized)) {
+        return false;
+      }
+
+      seen.add(normalized);
+      return true;
+    });
+}
+
+function syncVariantsFromMeasures(
+  measures: string,
+  currentVariants: ProductVariantFormState[]
+): ProductVariantFormState[] {
+  const measuresList = normalizeVariantMeasures(measures);
+
+  return measuresList.map((measure) => {
+    const existingVariant = currentVariants.find(
+      (variant) => variant.medida.toLowerCase() === measure.toLowerCase()
+    );
+
+    return existingVariant || { medida: measure, stock: "", sku: "" };
+  });
+}
+
+function sumVariantStock(variants: ProductVariantFormState[]): string {
+  const total = variants.reduce((sum, variant) => {
+    const parsed = Number(variant.stock);
+    return Number.isFinite(parsed) && parsed >= 0 ? sum + parsed : sum;
+  }, 0);
+
+  return String(total);
+}
+
+export function useAdminCatalog(): UseAdminCatalogResult {
+  const router = useRouter();
+  const [auth, setAuth] = useState<Auth | null>(null);
+  const [booting, setBooting] = useState(true);
+  const [activeTab, setActiveTabState] = useState<AdminTab>("products");
+  const [sessionEmail, setSessionEmail] = useState("");
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [productFilter, setProductFilter] = useState("");
+  const deferredProductFilter = useDeferredValue(productFilter);
+  const [editingCategoryId, setEditingCategoryId] = useState("");
+  const [editingProductId, setEditingProductId] = useState("");
+  const [existingProductImages, setExistingProductImages] = useState<ProductImageAsset[]>([]);
+  const [existingImagesMarkedForRemoval, setExistingImagesMarkedForRemoval] = useState(false);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const imagePreviewsRef = useRef<string[]>([]);
+  const loadedUserIdRef = useRef("");
+  const [isPending, startTransition] = useTransition();
+  const [pendingAction, setPendingAction] = useState<
+    "category-submit" | "product-submit" | "logout" | null
+  >(null);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [deleteError, setDeleteError] = useState("");
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+
+  const [categoryForm, setCategoryForm] = useState<CategoryFormState>(EMPTY_CATEGORY_FORM);
+  const [productForm, setProductForm] = useState<ProductFormState>(EMPTY_PRODUCT_FORM);
+
+  useEffect(() => {
+    imagePreviewsRef.current = imagePreviews;
+  }, [imagePreviews]);
+
+  useEffect(() => {
+    return () => {
+      if (imagePreviewsRef.current.length > 0) {
+        imagePreviewsRef.current.forEach((preview) => URL.revokeObjectURL(preview));
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!notice) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setNotice("");
+    }, 3500);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [notice]);
+
+  const loadCatalog = useCallback(async (currentAuth?: Auth): Promise<void> => {
+    const resolvedAuth = currentAuth ?? auth;
+
+    if (!resolvedAuth) {
+      return;
+    }
+
+    setError("");
+
+    const response = await authorizedFetch(resolvedAuth, "/api/admin/catalog");
+    const payload = await parseJson<
+      { categories: Category[]; products: Product[] } | ErrorResponseBody
+    >(response);
+
+    if (!response.ok) {
+      throw new Error(getResponseErrorMessage(payload, "No se pudo cargar el catalogo."));
+    }
+
+    if (!isAdminCatalogPayload(payload)) {
+      throw new Error("La API devolvio un formato invalido.");
+    }
+
+    setCategories(sortCategories(payload.categories));
+    setProducts(sortProducts(payload.products));
+  }, [auth]);
+
+  useEffect(() => {
+    let unsubscribe: () => void = () => undefined;
+
+    startTransition(() => {
+      void (async () => {
+        try {
+          const authInstance = await getFirebaseClientAuth();
+          setAuth(authInstance);
+
+          unsubscribe = onIdTokenChanged(authInstance, async (user) => {
+            if (!user) {
+              loadedUserIdRef.current = "";
+              router.replace("/admin/login");
+              return;
+            }
+
+            const session = await getAdminSession(authInstance, user);
+
+            if (!session) {
+              loadedUserIdRef.current = "";
+              await signOut(authInstance);
+              router.replace("/admin/login");
+              return;
+            }
+
+            setSessionEmail(session.user.email || "admin");
+            await persistAdminSession(session.user);
+
+            if (loadedUserIdRef.current !== session.user.uid) {
+              try {
+                await loadCatalog(authInstance);
+                loadedUserIdRef.current = session.user.uid;
+              } catch (currentError: unknown) {
+                setFailure(
+                  isErrorWithMessage(currentError)
+                    ? currentError.message
+                    : "No se pudo cargar el catalogo."
+                );
+              }
+            }
+
+            setBooting(false);
+          });
+        } catch (currentError: unknown) {
+          setError(
+            isErrorWithMessage(currentError)
+              ? currentError.message
+              : "No se pudo inicializar el panel."
+          );
+          setBooting(false);
+        }
+      })();
+    });
+
+    return () => unsubscribe();
+  }, [loadCatalog, router]);
+
+  function setSuccess(message: string): void {
+    setNotice(message);
+    setError("");
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }
+
+  function setFailure(message: string): void {
+    setError(message);
+    setNotice("");
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }
+
+  function updateCategoryField(
+    field: keyof CategoryFormState,
+    value: string
+  ): void {
+    setCategoryForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  }
+
+  function updateProductField(
+    field: keyof ProductFormState,
+    value: string | File[] | ProductVariantFormState[] | null
+  ): void {
+    setProductForm((current): ProductFormState => {
+      if (field === "medidas" && typeof value === "string") {
+        const nextVariants =
+          current.tipo_medida === "none"
+            ? []
+            : syncVariantsFromMeasures(value, current.variantes);
+
+        return {
+          ...current,
+          medidas: value,
+          variantes: nextVariants,
+          stock:
+            nextVariants.length > 0 && nextVariants.some((variant) => variant.stock !== "")
+              ? sumVariantStock(nextVariants)
+              : current.stock,
+        };
+      }
+
+      if (field === "tipo_medida" && typeof value === "string") {
+        if (value === "none") {
+          return {
+            ...current,
+            tipo_medida: "none",
+            medidas: "",
+            variantes: [],
+          };
+        }
+
+        const nextVariants = syncVariantsFromMeasures(current.medidas, current.variantes);
+
+        return {
+          ...current,
+          tipo_medida: value as ProductFormState["tipo_medida"],
+          variantes: nextVariants,
+          stock:
+            nextVariants.length > 0 && nextVariants.some((variant) => variant.stock !== "")
+              ? sumVariantStock(nextVariants)
+              : current.stock,
+        };
+      }
+
+      if (field === "variantes" && Array.isArray(value)) {
+        const nextVariants = value as ProductVariantFormState[];
+
+        return {
+          ...current,
+          variantes: nextVariants,
+          stock:
+            nextVariants.some((variant) => variant.stock !== "")
+              ? sumVariantStock(nextVariants)
+              : current.stock,
+        };
+      }
+
+      return {
+        ...current,
+        [field]: value,
+      } as ProductFormState;
+    });
+  }
+
+  function updateProductVariantField(
+    index: number,
+    field: keyof ProductVariantFormState,
+    value: string
+  ): void {
+    setProductForm((current) => {
+      const nextVariants = current.variantes.map((variant, currentIndex) =>
+        currentIndex === index
+          ? {
+              ...variant,
+              [field]: value,
+            }
+          : variant
+      );
+
+      return {
+        ...current,
+        variantes: nextVariants,
+        stock:
+          nextVariants.some((variant) => variant.stock !== "")
+            ? sumVariantStock(nextVariants)
+            : current.stock,
+      };
+    });
+  }
+
+  function clearObjectPreview(): void {
+    if (imagePreviews.length > 0) {
+      imagePreviews.forEach((preview) => URL.revokeObjectURL(preview));
+      imagePreviewsRef.current = [];
+      setImagePreviews([]);
+    }
+  }
+
+  function appendImageFiles(files: File[]): void {
+    const validImages = files.filter((file) => file.type.startsWith("image/"));
+
+    if (validImages.length === 0) {
+      return;
+    }
+
+    if (validImages.some((file) => file.size > MAX_PRODUCT_IMAGE_SIZE_BYTES)) {
+      setFailure("Cada imagen debe pesar como maximo 8 MB.");
+      return;
+    }
+
+    const mergedFiles = [...productForm.imagenes];
+    const nextPreviews = [...imagePreviews];
+
+    for (const file of validImages) {
+      if (mergedFiles.some((currentFile) => isSameFile(currentFile, file))) {
+        continue;
+      }
+
+      mergedFiles.push(file);
+      nextPreviews.push(URL.createObjectURL(file));
+    }
+
+    if (mergedFiles.length > MAX_PRODUCT_IMAGE_COUNT) {
+      nextPreviews.forEach((preview) => {
+        if (!imagePreviews.includes(preview)) {
+          URL.revokeObjectURL(preview);
+        }
+      });
+      setFailure(`Solo puedes subir hasta ${MAX_PRODUCT_IMAGE_COUNT} imagenes por producto.`);
+      return;
+    }
+
+    updateProductField("imagenes", mergedFiles);
+    setImagePreviews(nextPreviews);
+  }
+
+  function handleImageChange(event: ChangeEvent<HTMLInputElement>): void {
+    const files = event.target.files ? Array.from(event.target.files) : [];
+    appendImageFiles(files);
+    event.target.value = "";
+  }
+
+  function setPrimarySelectedImage(index: number): void {
+    if (index <= 0 || index >= productForm.imagenes.length || index >= imagePreviews.length) {
+      return;
+    }
+
+    const nextFiles = [...productForm.imagenes];
+    const nextPreviews = [...imagePreviews];
+    const [primaryFile] = nextFiles.splice(index, 1);
+    const [primaryPreview] = nextPreviews.splice(index, 1);
+
+    nextFiles.unshift(primaryFile);
+    nextPreviews.unshift(primaryPreview);
+
+    updateProductField("imagenes", nextFiles);
+    setImagePreviews(nextPreviews);
+  }
+
+  function setPrimaryExistingImage(index: number): void {
+    if (index <= 0 || index >= existingProductImages.length) {
+      return;
+    }
+
+    setExistingProductImages((current) => {
+      const nextImages = [...current];
+      const [primaryImage] = nextImages.splice(index, 1);
+      nextImages.unshift(primaryImage);
+      return nextImages;
+    });
+    setExistingImagesMarkedForRemoval(false);
+  }
+
+  function removeExistingImage(index: number): void {
+    if (index < 0 || index >= existingProductImages.length) {
+      return;
+    }
+
+    setExistingProductImages((current) => {
+      const nextImages = current.filter((_, currentIndex) => currentIndex !== index);
+      setExistingImagesMarkedForRemoval(nextImages.length === 0);
+      return nextImages;
+    });
+  }
+
+  function clearSelectedImages(): void {
+    if (productForm.imagenes.length === 0 && existingProductImages.length > 0) {
+      setExistingProductImages([]);
+      setExistingImagesMarkedForRemoval(true);
+      return;
+    }
+
+    clearObjectPreview();
+    updateProductField("imagenes", []);
+  }
+
+  function resetCategoryForm(): void {
+    setCategoryForm(EMPTY_CATEGORY_FORM);
+    setEditingCategoryId("");
+  }
+
+  function resetProductForm(): void {
+    setProductForm(EMPTY_PRODUCT_FORM);
+    setEditingProductId("");
+    setExistingProductImages([]);
+    setExistingImagesMarkedForRemoval(false);
+    clearObjectPreview();
+  }
+
+  function requestCategoryDelete(category: Category): void {
+    setDeleteError("");
+    setDeleteTarget({
+      kind: "category",
+      id: category.id_categoria,
+      label: category.nombre_categoria,
+    });
+  }
+
+  function requestProductDelete(product: Product): void {
+    setDeleteError("");
+    setDeleteTarget({
+      kind: "product",
+      id: product.id_producto,
+      label: product.nombre,
+    });
+  }
+
+  function closeDeleteDialog(): void {
+    if (deleteSubmitting) {
+      return;
+    }
+
+    setDeleteError("");
+    setDeleteTarget(null);
+  }
+
+  function beginCategoryEdit(category: Category): void {
+    setActiveTabState("categories");
+    setEditingCategoryId(category.id_categoria);
+    setCategoryForm({
+      nombre_categoria: category.nombre_categoria || "",
+      slug: "",
+    });
+    setSuccess("Categoria cargada para editar.");
+  }
+
+  function beginProductEdit(product: Product): void {
+    setActiveTabState("products");
+    setEditingProductId(product.id_producto);
+    setExistingProductImages(
+      product.imagenes.length > 0
+        ? product.imagenes.map((url, index) => ({
+            url,
+            path: product.image_paths?.[index] || null,
+          }))
+        : product.imagen
+          ? [{ url: product.imagen, path: product.image_path || null }]
+          : []
+    );
+    setExistingImagesMarkedForRemoval(false);
+    setProductForm({
+      nombre: product.nombre || "",
+      descripcion: product.descripcion || "",
+      precio: String(product.precio_lista ?? product.precio ?? ""),
+      precio_promocional:
+        product.precio_promocional !== null && product.precio_promocional !== undefined
+          ? String(product.precio_promocional)
+          : "",
+      id_categoria: product.id_categoria || "",
+      stock: String(product.stock ?? ""),
+      tag: product.tag || "",
+      tipo_medida: product.tipo_medida || "none",
+      medidas: product.medidas.join(", "),
+      variantes:
+        product.variantes.length > 0
+          ? product.variantes.map((variant) => ({
+              medida: variant.medida,
+              stock: String(variant.stock),
+              sku: variant.sku || "",
+            }))
+          : syncVariantsFromMeasures(product.medidas.join(", "), []),
+      imagenes: [],
+    });
+    clearObjectPreview();
+    setSuccess("Producto cargado para editar.");
+  }
+
+  function submitCategory(event: FormEvent<HTMLFormElement>): void {
+    event.preventDefault();
+
+    if (!auth) {
+      return;
+    }
+
+    setPendingAction("category-submit");
+
+    startTransition(() => {
+      void (async () => {
+        try {
+          const endpoint = editingCategoryId
+            ? `/api/categorias/${editingCategoryId}`
+            : "/api/categorias";
+
+          const response = await authorizedFetch(auth, endpoint, {
+            method: editingCategoryId ? "PUT" : "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              nombre_categoria: categoryForm.nombre_categoria,
+            }),
+          });
+
+          const payload = await parseJson<unknown>(response);
+
+          if (!response.ok) {
+            throw new Error(
+              getResponseErrorMessage(payload, "No se pudo guardar la categoria.")
+            );
+          }
+
+          if (!isCategory(payload)) {
+            throw new Error("La API devolvio una categoria invalida.");
+          }
+
+          const wasEditing = Boolean(editingCategoryId);
+          resetCategoryForm();
+          setCategories((current) => upsertCategory(current, payload));
+          setSuccess(
+            wasEditing
+              ? "Categoria actualizada correctamente."
+              : "Categoria creada correctamente."
+          );
+        } catch (currentError: unknown) {
+          setFailure(
+            isErrorWithMessage(currentError)
+              ? currentError.message
+              : "No se pudo guardar la categoria."
+          );
+        } finally {
+          setPendingAction(null);
+        }
+      })();
+    });
+  }
+
+  function submitProduct(event: FormEvent<HTMLFormElement>): void {
+    event.preventDefault();
+
+    if (!auth) {
+      return;
+    }
+
+    setPendingAction("product-submit");
+
+    startTransition(() => {
+      void (async () => {
+        try {
+          const normalizedVariants = productForm.variantes
+            .map((variant) => ({
+              medida: variant.medida.trim(),
+              stock: variant.stock.trim(),
+              sku: variant.sku.trim(),
+            }))
+            .filter((variant) => variant.medida);
+          const hasVariantStocks = normalizedVariants.some((variant) => variant.stock !== "");
+
+          if (
+            productForm.tipo_medida !== "none" &&
+            hasVariantStocks &&
+            normalizedVariants.some((variant) => variant.stock === "")
+          ) {
+            throw new Error("Completa el stock de todas las variantes antes de guardar.");
+          }
+
+          const formData = new FormData();
+          formData.set("nombre", productForm.nombre);
+          formData.set("descripcion", productForm.descripcion);
+          formData.set("precio", productForm.precio);
+          formData.set("precio_promocional", productForm.precio_promocional);
+          formData.set("id_categoria", productForm.id_categoria);
+          formData.set("stock", productForm.stock);
+          formData.set("tag", productForm.tag);
+          formData.set("tipo_medida", productForm.tipo_medida);
+          formData.set("medidas", productForm.medidas);
+          if (productForm.tipo_medida !== "none" && hasVariantStocks) {
+            formData.set(
+              "variantes",
+              JSON.stringify(
+                normalizedVariants.map((variant) => ({
+                  medida: variant.medida,
+                  stock: variant.stock,
+                  sku: variant.sku || null,
+                }))
+              )
+            );
+          }
+          formData.set(
+            "clear_existing_images",
+            existingImagesMarkedForRemoval ? "true" : "false"
+          );
+          formData.set("existing_images", JSON.stringify(existingProductImages));
+
+          for (const image of productForm.imagenes) {
+            formData.append("imagenes", image);
+          }
+
+          const endpoint = editingProductId
+            ? `/api/productos/${editingProductId}`
+            : "/api/productos";
+
+          const response = await authorizedFetch(auth, endpoint, {
+            method: editingProductId ? "PUT" : "POST",
+            body: formData,
+          });
+
+          const payload = await parseJson<unknown>(response);
+
+          if (!response.ok) {
+            throw new Error(
+              getResponseErrorMessage(payload, "No se pudo guardar el producto.")
+            );
+          }
+
+          if (!isProduct(payload)) {
+            throw new Error("La API devolvio un producto invalido.");
+          }
+
+          const wasEditing = Boolean(editingProductId);
+          resetProductForm();
+          setProducts((current) => upsertProduct(current, payload));
+          setSuccess(
+            wasEditing
+              ? "Producto actualizado correctamente."
+              : "Producto creado correctamente."
+          );
+        } catch (currentError: unknown) {
+          setFailure(
+            isErrorWithMessage(currentError)
+              ? currentError.message
+              : "No se pudo guardar el producto."
+          );
+        } finally {
+          setPendingAction(null);
+        }
+      })();
+    });
+  }
+
+  function confirmDelete(): void {
+    if (!auth || !deleteTarget) {
+      return;
+    }
+
+    const currentTarget = deleteTarget;
+    setDeleteSubmitting(true);
+    setDeleteError("");
+
+    startTransition(() => {
+      void (async () => {
+        try {
+          const endpoint =
+            currentTarget.kind === "category"
+              ? `/api/categorias/${currentTarget.id}`
+              : `/api/productos/${currentTarget.id}`;
+          const response = await authorizedFetch(auth, endpoint, {
+            method: "DELETE",
+          });
+          const payload = await parseJson<unknown>(response);
+
+          if (!response.ok) {
+            throw new Error(
+              getResponseErrorMessage(
+                payload,
+                currentTarget.kind === "category"
+                  ? "No se pudo eliminar la categoria."
+                  : "No se pudo eliminar el producto."
+              )
+            );
+          }
+
+          if (currentTarget.kind === "category" && editingCategoryId === currentTarget.id) {
+            resetCategoryForm();
+          }
+
+          if (currentTarget.kind === "product" && editingProductId === currentTarget.id) {
+            resetProductForm();
+          }
+
+          if (currentTarget.kind === "category") {
+            setCategories((current) =>
+              current.filter((category) => category.id_categoria !== currentTarget.id)
+            );
+          } else {
+            setProducts((current) =>
+              current.filter((product) => product.id_producto !== currentTarget.id)
+            );
+          }
+
+          setDeleteTarget(null);
+          setSuccess(
+            currentTarget.kind === "category"
+              ? "Categoria eliminada correctamente."
+              : "Producto eliminado correctamente."
+          );
+        } catch (currentError: unknown) {
+          setDeleteError(
+            isErrorWithMessage(currentError)
+              ? currentError.message
+              : currentTarget.kind === "category"
+                ? "No se pudo eliminar la categoria."
+                : "No se pudo eliminar el producto."
+          );
+        } finally {
+          setDeleteSubmitting(false);
+        }
+      })();
+    });
+  }
+
+  function logout(): void {
+    if (!auth) {
+      return;
+    }
+
+    setPendingAction("logout");
+
+    startTransition(() => {
+      void (async () => {
+        try {
+          loadedUserIdRef.current = "";
+          await clearAdminSession();
+          await signOut(auth);
+          router.replace("/admin/login");
+        } finally {
+          setPendingAction(null);
+        }
+      })();
+    });
+  }
+
+  function setActiveTab(value: string): void {
+    if (value === "products" || value === "categories") {
+      setActiveTabState(value);
+    }
+  }
+
+  const normalizedFilter = normalizeText(deferredProductFilter);
+  const filteredProducts = useMemo(
+    () =>
+      products.filter((product) =>
+        normalizeText(product.nombre).includes(normalizedFilter)
+      ),
+    [normalizedFilter, products]
+  );
+
+  return {
+    booting,
+    activeTab,
+    setActiveTab,
+    sessionEmail,
+    error,
+    notice,
+    categories,
+    products,
+    filteredProducts,
+    productFilter,
+    setProductFilter,
+    editingCategoryId,
+    editingProductId,
+    existingProductImages,
+    imagePreviews,
+    isPending,
+    categorySubmitting: pendingAction === "category-submit",
+    productSubmitting: pendingAction === "product-submit",
+    deleteDialogOpen: Boolean(deleteTarget),
+    deleteDialogType: deleteTarget?.kind || null,
+    deleteDialogLabel: deleteTarget?.label || "",
+    deleteDialogError: deleteError,
+    deleteSubmitting,
+    categoryForm,
+    productForm,
+    updateCategoryField,
+    updateProductField,
+    updateProductVariantField,
+    handleImageChange,
+    appendImageFiles,
+    setPrimarySelectedImage,
+    setPrimaryExistingImage,
+    removeExistingImage,
+    clearSelectedImages,
+    resetCategoryForm,
+    resetProductForm,
+    beginCategoryEdit,
+    beginProductEdit,
+    submitCategory,
+    submitProduct,
+    requestCategoryDelete,
+    requestProductDelete,
+    closeDeleteDialog,
+    confirmDelete,
+    logout,
+  };
+}
