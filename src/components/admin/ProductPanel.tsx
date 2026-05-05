@@ -94,6 +94,15 @@ export function ProductPanel({
 }: ProductPanelProps) {
   const [isDragActive, setIsDragActive] = useState(false);
   const dragDepthRef = useRef(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 11;
+
+
+  const totalPages = Math.ceil(filteredProducts.length / ITEMS_PER_PAGE);
+  const paginatedProducts = filteredProducts.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   const handleTextField =
     (field: keyof ProductFormState) =>
@@ -355,7 +364,7 @@ export function ProductPanel({
                         {productForm.variantes.map((variant, index) => (
                           <div key={variant.medida || index} className="grid gap-2 sm:grid-cols-[minmax(6rem,0.9fr)_minmax(7rem,1fr)]">
                             <div
-                              className="flex h-10 min-w-[6rem] items-center rounded-md border border-zinc-300 bg-white px-3 text-sm font-medium text-black"
+                              className="flex h-10 min-w-24 items-center rounded-md border border-zinc-300 bg-white px-3 text-sm font-medium text-black"
                               aria-label={`Medida ${index + 1}`}
                               title={variant.medida}
                             >
@@ -606,7 +615,7 @@ export function ProductPanel({
       </div>
 
       <div className="lg:col-span-2">
-        <Card className="rounded-md border-zinc-300 shadow-none">
+        <Card className="flex h-[1053px] flex-col overflow-hidden rounded-md border-zinc-300 shadow-none">
           <CardHeader className="border-b border-zinc-200 pb-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <CardTitle>Productos ({products.length})</CardTitle>
@@ -614,7 +623,10 @@ export function ProductPanel({
                 <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
                 <Input
                   value={productFilter}
-                  onChange={(event) => onFilterChange(event.target.value)}
+                  onChange={(event) => {
+                    onFilterChange(event.target.value);
+                    setCurrentPage(1);
+                  }}
                   placeholder="Buscar productos..."
                   className="pl-9"
                 />
@@ -622,25 +634,25 @@ export function ProductPanel({
             </div>
           </CardHeader>
 
-          <CardContent>
-            <Table>
+          <CardContent className="min-h-0 flex-1 overflow-y-auto">
+            <Table className="h-full">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[260px]">Nombre</TableHead>
+                  <TableHead className="sticky left-0 z-20 w-[260px] bg-white shadow-[1px_0_0_0_#e4e4e7]">Nombre</TableHead>
                   <TableHead className="text-center">Precio</TableHead>
                   <TableHead className="text-center">Stock</TableHead>
                   <TableHead>Categoria</TableHead>
                   <TableHead>Medidas</TableHead>
                   <TableHead className="text-center">Imgs</TableHead>
                   <TableHead>Tag</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
+                  <TableHead className="sticky right-0 z-20 bg-white text-right shadow-[-1px_0_0_0_#e4e4e7]">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredProducts.length > 0 ? (
-                  filteredProducts.map((product) => (
-                    <TableRow key={product.id_producto}>
-                      <TableCell className="font-medium">
+                {paginatedProducts.length > 0 ? (
+                  paginatedProducts.map((product) => (
+                    <TableRow key={product.id_producto} className="group">
+                      <TableCell className="sticky left-0 z-20 max-w-[260px] bg-white font-medium shadow-[1px_0_0_0_#e4e4e7] group-hover:bg-zinc-50">
                         <div className="flex items-center gap-2">
                           {product.imagen ? (
                             <Image
@@ -650,10 +662,10 @@ export function ProductPanel({
                               height={32}
                               unoptimized
                               sizes="32px"
-                              className="h-8 w-8 rounded-sm object-cover"
+                              className="size-8 shrink-0 rounded-sm object-cover"
                             />
                           ) : null}
-                          <span>{product.nombre}</span>
+                          <span className="truncate" title={product.nombre}>{product.nombre}</span>
                         </div>
                       </TableCell>
                       <TableCell className="text-center">
@@ -694,7 +706,7 @@ export function ProductPanel({
                           <span className="text-sm text-zinc-400">-</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="sticky right-0 z-20 bg-white text-right shadow-[-1px_0_0_0_#e4e4e7] group-hover:bg-zinc-50">
                         <div className="flex justify-end gap-2">
                           <Button
                             size="icon"
@@ -730,6 +742,29 @@ export function ProductPanel({
               </TableBody>
             </Table>
           </CardContent>
+          <div className="flex items-center justify-between border-t border-zinc-200 px-4 py-3 sm:px-6">
+            <div className="text-sm text-zinc-500">
+              Página {currentPage} de {totalPages || 1}
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              >
+                Anterior
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage === totalPages || totalPages === 0}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              >
+                Siguiente
+              </Button>
+            </div>
+          </div>
         </Card>
       </div>
     </div>
