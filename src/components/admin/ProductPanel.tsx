@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { useRef, useState, type ChangeEvent, type DragEvent, type FormEvent } from "react";
-import { Check, FileImage, LoaderCircle, Pencil, Plus, Save, Search, Trash2 } from "lucide-react";
+import { Check, ChevronDown, FileImage, LoaderCircle, Pencil, Plus, Save, Search, Trash2 } from "lucide-react";
 import type {
   Product,
   ProductFormState,
@@ -95,6 +95,7 @@ export function ProductPanel({
   const [isDragActive, setIsDragActive] = useState(false);
   const dragDepthRef = useRef(0);
   const [currentPage, setCurrentPage] = useState(1);
+  const [formOpen, setFormOpen] = useState(false);
   const ITEMS_PER_PAGE = 11;
 
 
@@ -186,19 +187,30 @@ export function ProductPanel({
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
       <div className="lg:col-span-1">
         <Card className="overflow-hidden rounded-md border-zinc-300 shadow-none">
-          <CardHeader className="border-b border-zinc-200 pb-4">
+          <CardHeader
+            className="cursor-pointer border-b border-zinc-200 pb-4 lg:cursor-default"
+            onClick={() => setFormOpen((prev) => !prev)}
+          >
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <CardTitle>
-                  {editingProductId ? "Actualizar Producto" : "Agregar Producto"}
-                </CardTitle>
-                <CardDescription>
-                  Carga manual de productos.
-                </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>
+                    {editingProductId ? "Actualizar Producto" : "Agregar Producto"}
+                  </CardTitle>
+                  <CardDescription>
+                    Cargar Prendas.
+                  </CardDescription>
+                </div>
+                <ChevronDown
+                  className={cn(
+                    "size-5 shrink-0 text-zinc-500 transition-transform lg:hidden",
+                    formOpen && "rotate-180"
+                  )}
+                />
               </div>
 
               {editingProductId ? (
-                <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={onCancel}>
+                <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={(e) => { e.stopPropagation(); onCancel(); }}>
                   <Plus />
                   Volver a agregar
                 </Button>
@@ -206,7 +218,7 @@ export function ProductPanel({
             </div>
           </CardHeader>
 
-          <form onSubmit={onSubmit}>
+          <form onSubmit={onSubmit} className={cn("lg:block", formOpen ? "block" : "hidden")}>
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="product-name">Nombre del Producto</Label>
@@ -638,13 +650,11 @@ export function ProductPanel({
             <Table className="h-full">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="sticky left-0 z-20 w-[260px] bg-white shadow-[1px_0_0_0_#e4e4e7]">Nombre</TableHead>
+                  <TableHead className="w-[260px] bg-white lg:sticky lg:left-0 lg:z-20 lg:shadow-[1px_0_0_0_#e4e4e7]">Nombre</TableHead>
                   <TableHead className="text-center">Precio</TableHead>
                   <TableHead className="text-center">Stock</TableHead>
                   <TableHead>Categoria</TableHead>
                   <TableHead>Medidas</TableHead>
-                  <TableHead className="text-center">Imgs</TableHead>
-                  <TableHead>Tag</TableHead>
                   <TableHead className="sticky right-0 z-20 bg-white text-right shadow-[-1px_0_0_0_#e4e4e7]">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -652,7 +662,7 @@ export function ProductPanel({
                 {paginatedProducts.length > 0 ? (
                   paginatedProducts.map((product) => (
                     <TableRow key={product.id_producto} className="group">
-                      <TableCell className="sticky left-0 z-20 max-w-[260px] bg-white font-medium shadow-[1px_0_0_0_#e4e4e7] group-hover:bg-zinc-50">
+                      <TableCell className="max-w-[260px] bg-white font-medium group-hover:bg-zinc-50 lg:sticky lg:left-0 lg:z-20 lg:shadow-[1px_0_0_0_#e4e4e7]">
                         <div className="flex items-center gap-2">
                           {product.imagen ? (
                             <Image
@@ -692,19 +702,11 @@ export function ProductPanel({
                           <Badge variant="secondary">Sin stock</Badge>
                         )}
                       </TableCell>
-                      <TableCell>{categoryNameById(product.id_categoria)}</TableCell>
+                      <TableCell className="max-w-[140px]">
+                        <span className="truncate block" title={categoryNameById(product.id_categoria)}>{categoryNameById(product.id_categoria)}</span>
+                      </TableCell>
                       <TableCell className="text-sm text-zinc-600">
                         {productMeasures(product)}
-                      </TableCell>
-                      <TableCell className="text-center text-sm text-zinc-600">
-                        {product.imagenes.length}
-                      </TableCell>
-                      <TableCell>
-                        {product.tag ? (
-                          <Badge variant="outline">{product.tag}</Badge>
-                        ) : (
-                          <span className="text-sm text-zinc-400">-</span>
-                        )}
                       </TableCell>
                       <TableCell className="sticky right-0 z-20 bg-white text-right shadow-[-1px_0_0_0_#e4e4e7] group-hover:bg-zinc-50">
                         <div className="flex justify-end gap-2">
@@ -734,7 +736,7 @@ export function ProductPanel({
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={8} className="h-24 text-center text-zinc-500">
+                    <TableCell colSpan={6} className="h-24 text-center text-zinc-500">
                       {productFilter ? "No hay productos que coincidan con la busqueda." : "No hay productos disponibles."}
                     </TableCell>
                   </TableRow>

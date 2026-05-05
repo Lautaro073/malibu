@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ShoppingBag, Eye } from "lucide-react";
+import { Eye } from "lucide-react";
 import { AddToCartButton } from "@/components/storefront/AddToCartButton";
 import { ProductQuickViewTrigger } from "@/components/storefront/ProductQuickViewTrigger";
 import { buttonVariants } from "@/components/ui/button";
@@ -24,7 +24,27 @@ export function ProductCardActions({ product, categoryName, interactiveMode = "l
 
   const productHref = getProductHref(product);
 
-  const renderActionButton = () => {
+  const viewButton = interactiveMode === "link" ? (
+    <Link
+      href={productHref}
+      className={buttonVariants({ variant: "outline", className: "flex-1" })}
+    >
+      <Eye className="mr-2 h-4 w-4" />
+      Ver
+    </Link>
+  ) : (
+    <ProductQuickViewTrigger
+      product={product}
+      categoryName={categoryName}
+      className={buttonVariants({ variant: "outline", className: "flex-1 flex items-center justify-center gap-2" })}
+    >
+      <Eye className="h-4 w-4" />
+      Ver
+    </ProductQuickViewTrigger>
+  );
+
+  /* ── Mobile-only single button (original behavior) ── */
+  const mobileButton = () => {
     if (hasMeasures && !selectedMeasure) {
       if (interactiveMode === "link") {
         return (
@@ -37,7 +57,6 @@ export function ProductCardActions({ product, categoryName, interactiveMode = "l
           </Link>
         );
       }
-
       return (
         <ProductQuickViewTrigger
           product={product}
@@ -49,7 +68,6 @@ export function ProductCardActions({ product, categoryName, interactiveMode = "l
         </ProductQuickViewTrigger>
       );
     }
-
     return (
       <AddToCartButton
         key={selectedMeasure || "sin-talle"}
@@ -62,9 +80,9 @@ export function ProductCardActions({ product, categoryName, interactiveMode = "l
     );
   };
 
-  if (hasMeasures) {
-    return (
-      <div className="space-y-3">
+  return (
+    <div className="space-y-3">
+      {hasMeasures ? (
         <div className="hidden min-h-[74px] space-y-2 text-left sm:flex sm:min-h-[34px] sm:items-center sm:gap-3 sm:space-y-0">
           <p className="shrink-0 text-[11px] text-zinc-500 sm:text-xs">{measureLabel}</p>
           <div className="flex flex-wrap gap-2" role="radiogroup" aria-label={measureLabel}>
@@ -88,16 +106,27 @@ export function ProductCardActions({ product, categoryName, interactiveMode = "l
             ))}
           </div>
         </div>
+      ) : (
+        <div aria-hidden="true" className="hidden h-[74px] sm:block sm:h-[34px]" />
+      )}
 
-        {renderActionButton()}
+      {/* Mobile: single button (original behavior) */}
+      <div className="sm:hidden">
+        {mobileButton()}
       </div>
-    );
-  }
 
-  return (
-    <div className="space-y-3">
-      <div aria-hidden="true" className="hidden h-[74px] sm:block sm:h-[34px]" />
-      {renderActionButton()}
+      {/* Desktop: two buttons side by side */}
+      <div className="hidden gap-2 sm:flex">
+        <AddToCartButton
+          key={selectedMeasure || "sin-talle"}
+          productId={product.id_producto}
+          stock={getVariantStock(product, selectedMeasure || null)}
+          selectedMeasure={selectedMeasure || null}
+          requiresMeasure={hasMeasures}
+          className="flex-1"
+        />
+        {viewButton}
+      </div>
     </div>
   );
 }
