@@ -655,6 +655,7 @@ export function ProductPanel({
                   <TableHead className="text-center">Stock</TableHead>
                   <TableHead>Categoria</TableHead>
                   <TableHead>Medidas</TableHead>
+                  <TableHead>Tags</TableHead>
                   <TableHead className="sticky right-0 z-20 bg-white text-right shadow-[-1px_0_0_0_#e4e4e7]">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -707,6 +708,9 @@ export function ProductPanel({
                       </TableCell>
                       <TableCell className="text-sm text-zinc-600">
                         {productMeasures(product)}
+                      </TableCell>
+                      <TableCell className="text-sm text-zinc-600">
+                        {product.tag ? product.tag : "-"}
                       </TableCell>
                       <TableCell className="sticky right-0 z-20 bg-white text-right shadow-[-1px_0_0_0_#e4e4e7] group-hover:bg-zinc-50">
                         <div className="flex justify-end gap-2">
