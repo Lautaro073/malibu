@@ -579,7 +579,7 @@ export function StoreHeader() {
                 >
                   <Plus />
                   <span className="sr-only">
-                    {product.medidas.length > 0 ? "Ver detalle" : "Agregar producto"}
+                    {product.medidas.length > 0 ? "Ver producto" : "Agregar producto"}
                   </span>
                 </Button>
               </div>

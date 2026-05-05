@@ -72,7 +72,7 @@ export function ProductCard({
           fill
           quality={60}
           sizes="(max-width: 639px) 58vw, (max-width: 1023px) 32vw, (max-width: 1279px) 18rem, 18rem"
-          className="absolute inset-0 h-full w-full object-cover"
+          className="absolute inset-0 h-full w-full object-contain p-2"
         />
       ) : (
         <div className="absolute inset-0 flex items-center justify-center bg-[linear-gradient(135deg,#f5f5f5,#e5e5e5)] text-[10px] uppercase tracking-[0.25em] text-zinc-500 sm:text-xs">
@@ -102,24 +102,7 @@ export function ProductCard({
       )}
 
       <div className="mt-auto space-y-3 px-3 pb-3 sm:px-4 sm:pb-4">
-        {interactiveMode === "link" ? (
-          <Link
-            href={productHref}
-            className="inline-flex h-10 w-full items-center justify-center rounded-full border border-zinc-300 bg-white px-4 text-sm font-medium text-zinc-700 transition hover:border-black hover:text-black"
-          >
-            Ver producto
-          </Link>
-        ) : (
-          <ProductQuickViewTrigger
-            product={product}
-            categoryName={categoryName}
-            className="inline-flex h-10 w-full items-center justify-center rounded-full border border-zinc-300 bg-white px-4 text-sm font-medium text-zinc-700 transition hover:border-black hover:text-black"
-          >
-            Vista rapida
-          </ProductQuickViewTrigger>
-        )}
-
-        <ProductCardActions product={product} />
+        <ProductCardActions product={product} categoryName={categoryName} interactiveMode={interactiveMode} />
       </div>
     </article>
   );

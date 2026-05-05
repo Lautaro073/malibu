@@ -206,7 +206,7 @@ export function ProductQuickViewDialog({
                         quality={75}
                         sizes="(max-width: 639px) 100vw, 50vw"
                         draggable={false}
-                        className="object-cover transition-transform duration-300"
+                        className={`object-contain p-2 ${!isDragging ? "transition-transform duration-300" : ""}`}
                         style={{
                           transform: `translate(${imageOffset.x}px, ${imageOffset.y}px) scale(${zoomLevel})`,
                           transformOrigin: "center center",
@@ -285,7 +285,7 @@ export function ProductQuickViewDialog({
                           quality={50}
                           sizes="96px"
                           draggable={false}
-                          className="object-cover"
+                          className="object-contain p-1"
                         />
                       </div>
                     </button>

@@ -48,7 +48,7 @@ export function AddToCartButton({
     : stockReached
       ? "Sin stock"
     : missingMeasure
-      ? "Elegi un talle"
+      ? "Elegí un talle"
       : "Anadir al carrito";
 
   async function handleAdd(): Promise<void> {

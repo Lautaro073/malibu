@@ -107,10 +107,7 @@ export default function AdminLoginPage() {
           Acceso admin
         </p>
         <h1 className="mt-2 text-2xl font-semibold text-black">Iniciar sesion</h1>
-        <p className="mt-1 text-sm text-zinc-600">
-          Ingresar con un usuario existente de Firebase.
-        </p>
-
+        
         <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
           <label className="block space-y-2">
             <span className="text-sm font-medium text-zinc-700">Email</span>
