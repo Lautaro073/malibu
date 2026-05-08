@@ -74,6 +74,42 @@ export function StoreHeader() {
   const [isMobileSearchVisible, setIsMobileSearchVisible] = useState(false);
   const deferredSearchTerm = useDeferredValue(searchTerm);
 
+  const [promoBanner, setPromoBanner] = useState<{ text: string; enabled: boolean } | null>(null);
+
+  useEffect(() => {
+    // Cargar de localStorage en el cliente inmediatamente para evitar demora visual
+    try {
+      const cached = localStorage.getItem("malibu_promo_banner");
+      if (cached) {
+        setPromoBanner(JSON.parse(cached));
+      }
+    } catch (err) {
+      console.error("Error reading cached banner:", err);
+    }
+
+    async function fetchBanner() {
+      try {
+        const { getFirestore, doc, getDoc } = await import("firebase/firestore");
+        const { getFirebaseClientApp } = await import("@/lib/firebase/client");
+        const db = getFirestore(getFirebaseClientApp());
+        const docRef = doc(db, "settings", "banner");
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          const nextBanner = {
+            text: data.text || "",
+            enabled: typeof data.enabled === "boolean" ? data.enabled : false,
+          };
+          setPromoBanner(nextBanner);
+          localStorage.setItem("malibu_promo_banner", JSON.stringify(nextBanner));
+        }
+      } catch (err) {
+        console.error("Error fetching promo banner settings:", err);
+      }
+    }
+    void fetchBanner();
+  }, []);
+
   useEffect(() => {
     const target = cartButtonRef.current;
 
@@ -674,6 +710,60 @@ export function StoreHeader() {
           </div>
         </div>
       </header>
+
+      {promoBanner && promoBanner.enabled && promoBanner.text ? (
+        <>
+          <style dangerouslySetInnerHTML={{__html: `
+            @keyframes malibuMarquee {
+              0% { transform: translate3d(0, 0, 0); }
+              100% { transform: translate3d(-33.3333%, 0, 0); }
+            }
+            .malibu-marquee-container {
+              overflow: hidden;
+              white-space: nowrap;
+              display: flex;
+              align-items: center;
+              background-color: #09090b;
+              border-bottom: 1px solid #18181b;
+              padding-top: 0.65rem;
+              padding-bottom: 0.65rem;
+              width: 100%;
+            }
+            .malibu-marquee-content {
+              display: flex;
+              width: max-content;
+              animation: malibuMarquee 35s linear infinite;
+              will-change: transform;
+            }
+            .malibu-marquee-item {
+              padding-left: 2.5rem;
+              padding-right: 2.5rem;
+              font-size: 10px;
+              font-weight: 600;
+              letter-spacing: 0.22em;
+              text-transform: uppercase;
+              color: #ffffff;
+              flex-shrink: 0;
+            }
+            @media (min-width: 640px) {
+              .malibu-marquee-item {
+                font-size: 11px;
+                letter-spacing: 0.25em;
+              }
+            }
+          `}} />
+          <div className="malibu-marquee-container" aria-hidden="true">
+            <div className="malibu-marquee-content">
+              <span className="malibu-marquee-item">{promoBanner.text}</span>
+              <span className="malibu-marquee-item">{promoBanner.text}</span>
+              <span className="malibu-marquee-item">{promoBanner.text}</span>
+              <span className="malibu-marquee-item">{promoBanner.text}</span>
+              <span className="malibu-marquee-item">{promoBanner.text}</span>
+              <span className="malibu-marquee-item">{promoBanner.text}</span>
+            </div>
+          </div>
+        </>
+      ) : null}
 
       <div
         className={`fixed right-4 bottom-4 z-30 transition-all duration-300 sm:right-6 sm:bottom-6 ${showFloatingCartButton

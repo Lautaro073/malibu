@@ -934,8 +934,8 @@ export function useAdminCatalog(): UseAdminCatalogResult {
   }
 
   function setActiveTab(value: string): void {
-    if (value === "products" || value === "categories") {
-      setActiveTabState(value);
+    if (value === "products" || value === "categories" || value === "settings") {
+      setActiveTabState(value as AdminTab);
     }
   }
 

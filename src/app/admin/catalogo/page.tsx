@@ -7,6 +7,7 @@ import { AdminStatus } from "@/components/admin/AdminStatus";
 import { AdminTabs } from "@/components/admin/AdminTabs";
 import { CategoryPanel } from "@/components/admin/CategoryPanel";
 import { ProductPanel } from "@/components/admin/ProductPanel";
+import { SettingsPanel } from "@/components/admin/SettingsPanel";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAdminCatalog } from "@/hooks/useAdminCatalog";
 
@@ -88,6 +89,9 @@ export default function AdminCatalogPage() {
               onEdit={admin.beginCategoryEdit}
               onRequestDelete={admin.requestCategoryDelete}
             />
+          }
+          settingsContent={
+            <SettingsPanel />
           }
         />
       </div>
