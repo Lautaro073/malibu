@@ -17,10 +17,14 @@ const DEFAULT_SLIDES: Slide[] = [
   },
 ];
 
-export function HeroCarousel() {
-  const [slides, setSlides] = useState<Slide[]>([]);
-  const [enabled, setEnabled] = useState<boolean>(false);
-  const [isClient, setIsClient] = useState(false);
+interface HeroCarouselProps {
+  initialSlides?: Slide[];
+  initialEnabled?: boolean;
+}
+
+export function HeroCarousel({ initialSlides = DEFAULT_SLIDES, initialEnabled = true }: HeroCarouselProps) {
+  const [slides, setSlides] = useState<Slide[]>(initialSlides.length > 0 ? initialSlides : DEFAULT_SLIDES);
+  const [enabled, setEnabled] = useState<boolean>(initialEnabled);
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const touchStartX = useRef<number | null>(null);
@@ -34,74 +38,24 @@ export function HeroCarousel() {
     setCurrentIndex((prev) => (prev === slides.length - 1 ? 0 : prev + 1));
   };
 
-  // Cargar caché de localStorage después de la hidratación
-  useEffect(() => {
-    setIsClient(true);
-    try {
-      const cached = localStorage.getItem("malibu_carousel_settings");
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        const isEnabled = typeof parsed.enabled === "boolean" ? parsed.enabled : true;
-        if (isEnabled && Array.isArray(parsed.slides) && parsed.slides.length > 0) {
-          setSlides(parsed.slides);
-          setEnabled(isEnabled);
-          return;
-        }
-      }
-    } catch (err) {
-      console.error("Error reading cached carousel settings:", err);
-    }
-    
-    // Fallback inicial por defecto si no hay caché
-    setSlides(DEFAULT_SLIDES);
-    setEnabled(true);
-  }, []);
+  // Mantener sincronizado si cambian las props del servidor
+  const [prevInitialSlides, setPrevInitialSlides] = useState(initialSlides);
+  const [prevInitialEnabled, setPrevInitialEnabled] = useState(initialEnabled);
+  if (initialSlides !== prevInitialSlides || initialEnabled !== prevInitialEnabled) {
+    setPrevInitialSlides(initialSlides);
+    setPrevInitialEnabled(initialEnabled);
+    setSlides(initialSlides.length > 0 ? initialSlides : DEFAULT_SLIDES);
+    setEnabled(initialEnabled);
+  }
 
-  // Auto-play cada 6 segundos
+  // Auto-play cada 2,8 segundos
   useEffect(() => {
     if (slides.length <= 1) return;
     const timer = setInterval(() => {
-      handleNext();
-    }, 6000);
+      setCurrentIndex((prev) => (prev === slides.length - 1 ? 0 : prev + 1));
+    }, 2800);
     return () => clearInterval(timer);
-  }, [currentIndex, slides]);
-
-  // Sincronizar con Firestore en segundo plano
-  useEffect(() => {
-    if (!isClient) return;
-    async function fetchCarouselSettings() {
-      try {
-        const { getFirestore, doc, getDoc } = await import("firebase/firestore");
-        const { getFirebaseClientApp } = await import("@/lib/firebase/client");
-        const db = getFirestore(getFirebaseClientApp());
-        const docRef = doc(db, "settings", "carousel");
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          const isEnabled = typeof data.enabled === "boolean" ? data.enabled : true;
-          
-          let fetchedSlides = DEFAULT_SLIDES;
-          if (Array.isArray(data.slides) && data.slides.length > 0) {
-            fetchedSlides = data.slides.map((s: any) => ({
-              image: s.image || "/assets/malibu.jpg",
-              subtitle: s.subtitle || "",
-              title: s.title || "",
-            }));
-          }
-
-          setEnabled(isEnabled);
-          setSlides(fetchedSlides);
-          localStorage.setItem(
-            "malibu_carousel_settings",
-            JSON.stringify({ enabled: isEnabled, slides: fetchedSlides })
-          );
-        }
-      } catch (err) {
-        console.error("Error fetching carousel settings:", err);
-      }
-    }
-    void fetchCarouselSettings();
-  }, [isClient]);
+  }, [slides.length]);
 
   // Deslizamiento táctil para móviles
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -161,7 +115,7 @@ export function HeroCarousel() {
               
               {/* Overlay oscuro para legibilidad superior (solo si tiene texto) */}
               {hasText ? (
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-black/30" />
+                <div className="absolute inset-0 bg-linear-to-t from-black/60 via-black/20 to-black/30" />
               ) : null}
 
               {/* Contenido del Slide */}

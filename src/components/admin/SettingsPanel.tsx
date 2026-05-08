@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
 
 interface SlideConfig {
   image: string;
@@ -105,11 +106,10 @@ export function SettingsPanel() {
 
       localStorage.setItem("malibu_promo_banner", JSON.stringify(bannerData));
 
-      setBannerSuccess(true);
-      setTimeout(() => setBannerSuccess(false), 3000);
+      toast.success("Mensaje promocional guardado correctamente.");
     } catch (err) {
       console.error("Error saving banner settings:", err);
-      setError("No se pudieron guardar los cambios del banner.");
+      toast.error("No se pudieron guardar los cambios del mensaje promocional.");
     } finally {
       setSavingBanner(false);
     }
@@ -149,11 +149,10 @@ export function SettingsPanel() {
 
       localStorage.setItem("malibu_carousel_settings", JSON.stringify(carouselData));
 
-      setCarouselSuccess(true);
-      setTimeout(() => setCarouselSuccess(false), 3000);
+      toast.success("Imágenes de carrusel guardadas correctamente.");
     } catch (err) {
       console.error("Error saving carousel settings:", err);
-      setError("No se pudieron guardar los cambios del carrusel.");
+      toast.error("No se pudieron guardar los cambios del carrusel.");
     } finally {
       setSavingCarousel(false);
     }
@@ -183,18 +182,25 @@ export function SettingsPanel() {
     setUploadingIndex(index);
     setError("");
     try {
-      const { getStorage, ref, uploadBytes, getDownloadURL } = await import("firebase/storage");
-      const { getFirebaseClientApp } = await import("@/lib/firebase/client");
-      
-      const storage = getStorage(getFirebaseClientApp());
-      const fileRef = ref(storage, `carousel/${Date.now()}-${file.name}`);
-      await uploadBytes(fileRef, file);
-      const url = await getDownloadURL(fileRef);
-      
-      handleSlideChange(index, "image", url);
-    } catch (err) {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || "Error al subir a Cloudinary");
+      }
+
+      const data = await response.json();
+      handleSlideChange(index, "image", data.imageUrl);
+      toast.success("Foto subida correctamente.");
+    } catch (err: any) {
       console.error("Error uploading carousel image:", err);
-      setError("No se pudo subir la foto de campaña. Intentalo de nuevo.");
+      toast.error("No se pudo subir la foto de campaña. Intentalo de nuevo.");
     } finally {
       setUploadingIndex(null);
     }

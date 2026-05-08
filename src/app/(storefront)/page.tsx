@@ -1,4 +1,4 @@
-import { listAllProducts, listCategories } from "@/lib/catalog/service";
+import { listAllProducts, listCategories, getCarouselSettings, getPromoBannerSettings } from "@/lib/catalog/service";
 import { EmptyCatalogState } from "@/components/storefront/EmptyCatalogState";
 import { ProductGridWithQuickView } from "@/components/storefront/ProductGridWithQuickView";
 import { StoreHeader } from "@/components/storefront/StoreHeader";
@@ -20,9 +20,11 @@ interface ProductCategorySection {
 }
 
 export default async function Home() {
-  const [categories, products] = await Promise.all([
+  const [categories, products, carouselSettings, promoBannerSettings] = await Promise.all([
     listCategories(),
     listAllProducts(),
+    getCarouselSettings(),
+    getPromoBannerSettings(),
   ]);
 
   const categoryNameById = categories.reduce<Record<string, string>>((accumulator, category) => {
@@ -81,11 +83,16 @@ export default async function Home() {
       id="inicio"
       className="min-h-screen bg-[linear-gradient(180deg,#f8f8f8_0%,#ffffff_28%,#fafafa_100%)] text-black"
     >
-      <StoreHeader />
-      {products.length > 0 && <HeroCarousel />}
+      <StoreHeader initialPromoBanner={promoBannerSettings} />
+      {products.length > 0 && (
+        <HeroCarousel
+          initialSlides={carouselSettings.slides}
+          initialEnabled={carouselSettings.enabled}
+        />
+      )}
 
       <main className="mx-auto flex max-w-6xl flex-col gap-14 px-4 py-8 sm:px-6 sm:py-10">
-        {products.length > 0 ? (
+          {products.length > 0 ? (
           <>
             {discountedProducts.length > 0 ? (
               <section id="ofertas" className="space-y-5">

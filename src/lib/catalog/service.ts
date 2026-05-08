@@ -115,11 +115,13 @@ interface SearchProductsOptions {
 
 const CATEGORY_CACHE_TAG = "catalog:categories";
 const PRODUCT_CACHE_TAG = "catalog:products";
+const SETTINGS_CACHE_TAG = "catalog:settings";
 const CATALOG_REVALIDATE_SECONDS = 300;
 
 function revalidateCatalogCache(): void {
   revalidateTag(CATEGORY_CACHE_TAG, "max");
   revalidateTag(PRODUCT_CACHE_TAG, "max");
+  revalidateTag(SETTINGS_CACHE_TAG, "max");
 }
 
 function safeString(value: unknown): string {
@@ -1173,6 +1175,72 @@ export async function getProductStockById(
     variantes: product.variantes,
   };
 }
+
+export interface CarouselConfig {
+  enabled: boolean;
+  slides: {
+    image: string;
+    subtitle: string;
+    title: string;
+  }[];
+}
+
+export interface PromoBannerConfig {
+  enabled: boolean;
+  text: string;
+}
+
+export const getCarouselSettings = unstable_cache(
+  async (): Promise<CarouselConfig> => {
+    try {
+      const db = getFirebaseAdminDb();
+      const doc = await db.collection("settings").doc("carousel").get();
+      if (doc.exists) {
+        const data = doc.data() || {};
+        return {
+          enabled: typeof data.enabled === "boolean" ? data.enabled : true,
+          slides: Array.isArray(data.slides) ? data.slides.map((s: any) => ({
+            image: typeof s.image === "string" ? s.image : "/assets/malibu.jpg",
+            subtitle: typeof s.subtitle === "string" ? s.subtitle : "",
+            title: typeof s.title === "string" ? s.title : "",
+          })) : [],
+        };
+      }
+    } catch (err) {
+      console.error("Error loading carousel settings from admin db:", err);
+    }
+    return { enabled: true, slides: [] };
+  },
+  ["catalog-carousel-settings"],
+  {
+    revalidate: CATALOG_REVALIDATE_SECONDS,
+    tags: [SETTINGS_CACHE_TAG],
+  }
+);
+
+export const getPromoBannerSettings = unstable_cache(
+  async (): Promise<PromoBannerConfig> => {
+    try {
+      const db = getFirebaseAdminDb();
+      const doc = await db.collection("settings").doc("banner").get();
+      if (doc.exists) {
+        const data = doc.data() || {};
+        return {
+          enabled: typeof data.enabled === "boolean" ? data.enabled : false,
+          text: typeof data.text === "string" ? data.text : "",
+        };
+      }
+    } catch (err) {
+      console.error("Error loading promo banner settings from admin db:", err);
+    }
+    return { enabled: false, text: "" };
+  },
+  ["catalog-promo-banner-settings"],
+  {
+    revalidate: CATALOG_REVALIDATE_SECONDS,
+    tags: [SETTINGS_CACHE_TAG],
+  }
+);
 
 export async function getProductsByTag(tag: string): Promise<Product[]> {
   const normalizedTag = normalizeText(tag);

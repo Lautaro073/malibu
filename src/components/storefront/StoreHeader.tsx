@@ -49,7 +49,11 @@ function getSearchError(payload: unknown): string {
   return "No se pudo realizar la busqueda.";
 }
 
-export function StoreHeader() {
+interface StoreHeaderProps {
+  initialPromoBanner?: { text: string; enabled: boolean } | null;
+}
+
+export function StoreHeader({ initialPromoBanner = null }: StoreHeaderProps) {
   const router = useRouter();
   const ecommerceEnabled = isEcommerceEnabled();
   const userAccountsEnabled = isUserAccountsEnabled();
@@ -74,9 +78,17 @@ export function StoreHeader() {
   const [isMobileSearchVisible, setIsMobileSearchVisible] = useState(false);
   const deferredSearchTerm = useDeferredValue(searchTerm);
 
-  const [promoBanner, setPromoBanner] = useState<{ text: string; enabled: boolean } | null>(null);
+  const [promoBanner, setPromoBanner] = useState<{ text: string; enabled: boolean } | null>(initialPromoBanner);
+
+  const [prevInitialPromoBanner, setPrevInitialPromoBanner] = useState(initialPromoBanner);
+  if (initialPromoBanner !== prevInitialPromoBanner) {
+    setPrevInitialPromoBanner(initialPromoBanner);
+    setPromoBanner(initialPromoBanner);
+  }
 
   useEffect(() => {
+    if (initialPromoBanner) return;
+
     // Cargar de localStorage en el cliente inmediatamente para evitar demora visual
     try {
       const cached = localStorage.getItem("malibu_promo_banner");
@@ -108,7 +120,7 @@ export function StoreHeader() {
       }
     }
     void fetchBanner();
-  }, []);
+  }, [initialPromoBanner]);
 
   useEffect(() => {
     const target = cartButtonRef.current;
@@ -711,7 +723,9 @@ export function StoreHeader() {
         </div>
       </header>
 
-      {promoBanner && promoBanner.enabled && promoBanner.text ? (
+      {!promoBanner ? (
+        <div className="h-[38px] w-full bg-transparent" />
+      ) : promoBanner.enabled && promoBanner.text ? (
         <>
           <style dangerouslySetInnerHTML={{__html: `
             @keyframes malibuMarquee {
