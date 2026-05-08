@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import type { DocumentData } from "firebase-admin/firestore";
-import { revalidateTag, unstable_cache } from "next/cache";
+import { revalidatePath, revalidateTag, unstable_cache } from "next/cache";
 import { createHttpError } from "@/lib/api/errors";
 import {
   MAX_PRODUCT_IMAGE_COUNT,
@@ -122,6 +122,10 @@ function revalidateCatalogCache(): void {
   revalidateTag(CATEGORY_CACHE_TAG, "max");
   revalidateTag(PRODUCT_CACHE_TAG, "max");
   revalidateTag(SETTINGS_CACHE_TAG, "max");
+  
+  // Forzar la purga del HTML estático en el storefront y admin de inmediato
+  revalidatePath("/");
+  revalidatePath("/admin");
 }
 
 function safeString(value: unknown): string {
