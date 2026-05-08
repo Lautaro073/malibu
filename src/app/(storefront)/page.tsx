@@ -40,25 +40,30 @@ export default async function Home() {
       productsByCategoryId.set(product.id_categoria, categoryProducts);
     }
 
-    const tag = typeof product.tag === "string" ? product.tag.trim() : "";
+    const rawTag = typeof product.tag === "string" ? product.tag.trim() : "";
 
-    if (!tag) {
+    if (!rawTag) {
       untaggedProducts.push(product);
       continue;
     }
 
-    const tagKey = tag.toLowerCase();
-    const currentSection = tagSections.get(tagKey);
-
-    if (currentSection) {
-      currentSection.items.push(product);
-      continue;
+    const individualTags = rawTag.split(",").map((t) => t.trim()).filter(Boolean);
+    for (const singleTag of individualTags) {
+      const tagKey = singleTag.toLowerCase();
+      const currentSection = tagSections.get(tagKey);
+      if (currentSection) {
+        if (!currentSection.items.some((item) => item.id_producto === product.id_producto)) {
+          currentSection.items.push(product);
+        }
+      } else {
+        const formattedLabel = singleTag
+          .split(" ")
+          .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+          .join(" ");
+        tagSections.set(tagKey, { label: formattedLabel, items: [product] });
+      }
     }
 
-    tagSections.set(tagKey, {
-      label: tag,
-      items: [product],
-    });
   }
 
   const categorySections: ProductCategorySection[] = categories
