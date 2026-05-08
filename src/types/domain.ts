@@ -227,7 +227,7 @@ export interface CustomerAddressInput {
 export interface CartItemRecord {
   productId: string;
   quantity: number;
-  selectedMeasure?: string;
+  selectedMeasure?: string | null;
 }
 
 export interface RawCartRecord {

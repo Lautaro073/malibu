@@ -325,7 +325,7 @@ async function buildMergedItems(
       mergedItems[lineIndex] = {
         ...mergedItems[lineIndex],
         quantity: mergedItems[lineIndex].quantity + quantityToAdd,
-        selectedMeasure: selectedMeasure || undefined,
+        selectedMeasure: selectedMeasure || null,
       };
       continue;
     }
@@ -333,7 +333,7 @@ async function buildMergedItems(
     mergedItems.push({
       productId: item.productId,
       quantity: quantityToAdd,
-      selectedMeasure: selectedMeasure || undefined,
+      selectedMeasure: selectedMeasure || null,
     });
   }
 
@@ -645,13 +645,13 @@ export async function addOrUpdateCartItem(
       items[itemIndex] = {
         ...items[itemIndex],
         quantity: items[itemIndex].quantity + normalizedQuantity,
-        selectedMeasure: normalizedSelectedMeasure || undefined,
+        selectedMeasure: normalizedSelectedMeasure || null,
       };
     } else {
       items.push({
         productId: normalizedProductId,
         quantity: normalizedQuantity,
-        selectedMeasure: normalizedSelectedMeasure || undefined,
+        selectedMeasure: normalizedSelectedMeasure || null,
       });
     }
 
@@ -743,7 +743,7 @@ export async function replaceCartItemQuantity(
     items[itemIndex] = {
       ...items[itemIndex],
       quantity: normalizedQuantity,
-      selectedMeasure: normalizedSelectedMeasure || undefined,
+      selectedMeasure: normalizedSelectedMeasure || null,
     };
 
     transaction.update(ref, {
