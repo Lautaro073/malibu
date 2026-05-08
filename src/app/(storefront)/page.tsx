@@ -2,6 +2,7 @@ import { listAllProducts, listCategories } from "@/lib/catalog/service";
 import { EmptyCatalogState } from "@/components/storefront/EmptyCatalogState";
 import { ProductGridWithQuickView } from "@/components/storefront/ProductGridWithQuickView";
 import { StoreHeader } from "@/components/storefront/StoreHeader";
+import { HeroCarousel } from "@/components/storefront/HeroCarousel";
 import type { Product } from "@/types/domain";
 
 export const revalidate = 300;
@@ -81,6 +82,7 @@ export default async function Home() {
       className="min-h-screen bg-[linear-gradient(180deg,#f8f8f8_0%,#ffffff_28%,#fafafa_100%)] text-black"
     >
       <StoreHeader />
+      {products.length > 0 && <HeroCarousel />}
 
       <main className="mx-auto flex max-w-6xl flex-col gap-14 px-4 py-8 sm:px-6 sm:py-10">
         {products.length > 0 ? (
