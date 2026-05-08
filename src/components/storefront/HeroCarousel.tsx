@@ -85,7 +85,7 @@ export function HeroCarousel({ initialSlides = DEFAULT_SLIDES, initialEnabled = 
 
   return (
     <section 
-      className="relative w-full h-[45vh] min-h-[280px] sm:h-[60vh] bg-zinc-900 overflow-hidden border-b border-zinc-200"
+      className="relative w-full aspect-[3/4] sm:aspect-auto sm:h-[60vh] bg-zinc-900 overflow-hidden border-b border-zinc-200"
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
