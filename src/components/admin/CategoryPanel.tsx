@@ -51,6 +51,16 @@ export function CategoryPanel({
 }: CategoryPanelProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [formOpen, setFormOpen] = useState(false);
+  const [prevEditingCategoryId, setPrevEditingCategoryId] = useState(editingCategoryId);
+
+  if (editingCategoryId !== prevEditingCategoryId) {
+    setPrevEditingCategoryId(editingCategoryId);
+    if (editingCategoryId) {
+      setFormOpen(true);
+    } else {
+      setFormOpen(false);
+    }
+  }
 
   const handleNameChange = (event: ChangeEvent<HTMLInputElement>) => {
     onFieldChange("nombre_categoria", event.target.value);

@@ -97,6 +97,16 @@ export function ProductPanel({
   const [currentPage, setCurrentPage] = useState(1);
   const [formOpen, setFormOpen] = useState(false);
   const ITEMS_PER_PAGE = 11;
+  const [prevEditingProductId, setPrevEditingProductId] = useState(editingProductId);
+
+  if (editingProductId !== prevEditingProductId) {
+    setPrevEditingProductId(editingProductId);
+    if (editingProductId) {
+      setFormOpen(true);
+    } else {
+      setFormOpen(false);
+    }
+  }
 
 
   const totalPages = Math.ceil(filteredProducts.length / ITEMS_PER_PAGE);
@@ -127,7 +137,7 @@ export function ProductPanel({
       ? getDiscountPercentage(basePrice, promoPrice)
       : null;
   const productMeasures = (product: Product) =>
-    ecommerceEnabled && product.variantes.length > 0
+    product.variantes.length > 0
       ? product.variantes.map((variant) => `${variant.medida}:${variant.stock}`).join(" | ")
       : product.medidas.length > 0
         ? product.medidas.join(" | ")
@@ -280,30 +290,20 @@ export function ProductPanel({
                   ) : null}
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="product-stock">
-                    {productForm.tipo_medida === "none" ? "Stock" : "Stock total"}
-                  </Label>
-                  <Input
-                    id="product-stock"
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={productForm.stock}
-                    onChange={handleTextField("stock")}
-                    readOnly={
-                      ecommerceEnabled &&
-                      productForm.tipo_medida !== "none" &&
-                      productForm.variantes.some((variant) => variant.stock !== "")
-                    }
-                    required
-                  />
-                  {ecommerceEnabled && productForm.tipo_medida !== "none" ? (
-                    <p className="text-xs text-zinc-500">
-                      Se actualiza automaticamente si se completa stock por talla.
-                    </p>
-                  ) : null}
-                </div>
+                {productForm.tipo_medida === "none" ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="product-stock">Stock</Label>
+                    <Input
+                      id="product-stock"
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={productForm.stock}
+                      onChange={handleTextField("stock")}
+                      required
+                    />
+                  </div>
+                ) : null}
               </div>
 
               <div className="space-y-2">
@@ -363,13 +363,18 @@ export function ProductPanel({
                     Separalos con coma para guardar varias opciones.
                   </p>
 
-                  {ecommerceEnabled && productForm.variantes.length > 0 ? (
+                  {productForm.variantes.length > 0 ? (
                     <div className="space-y-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-sm font-medium text-black">Stock por medida</p>
-                        <span className="text-xs text-zinc-500">
-                          Completa stock por talle para activar variantes reales.
-                        </span>
+                      <div className="flex items-center justify-between gap-3 border-b border-zinc-200 pb-2 mb-2">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-black">Stock por talle</p>
+                          <p className="text-[10px] leading-tight text-zinc-500">
+                            Completa stock por talle para activar variantes reales.
+                          </p>
+                        </div>
+                        <Badge variant="outline" className="bg-zinc-900 text-white border-none px-3 py-1 font-semibold rounded-full shrink-0 text-xs">
+                          Total: {productForm.stock || 0}
+                        </Badge>
                       </div>
 
                       <div className="space-y-2">
