@@ -28,7 +28,7 @@ export default function NotFound() {
             href="/"
             className="inline-flex h-11 items-center justify-center rounded-full border border-zinc-300 px-5 text-sm font-medium text-zinc-700 transition hover:border-black hover:text-black"
           >
-            Ver productos
+            Ver prendas
           </Link>
         </div>
       </div>

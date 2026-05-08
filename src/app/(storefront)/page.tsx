@@ -104,13 +104,13 @@ export default async function Home() {
                     <div>
                       <h2 className="text-2xl font-semibold tracking-tight">Ofertas</h2>
                       <p className="text-sm text-zinc-500">
-                        Productos seleccionados con precio especial por tiempo limitado.
+                        Prendas seleccionadas con precio especial por tiempo limitado.
                       </p>
                     </div>
                     <span className="inline-flex w-fit rounded-full border border-zinc-300 bg-white px-3 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-zinc-600">
                       {discountedProducts.length === 1
-                        ? "1 producto con descuento"
-                        : `${discountedProducts.length} productos con descuento`}
+                        ? "1 prenda con descuento"
+                        : `${discountedProducts.length} prendas con descuento`}
                     </span>
                   </div>
                 </div>
@@ -171,14 +171,14 @@ export default async function Home() {
           <section id="catalogo" className="space-y-5">
             <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">
-                Productos
+                Prendas
               </p>
               <h2 className="text-2xl font-semibold tracking-tight">Catalogo</h2>
             </div>
 
             <EmptyCatalogState
-              title="Todavia no hay productos"
-              description="Carga el primer producto desde el panel admin y se mostrara aca para los usuarios."
+              title="Todavia no hay prendas"
+              description="Carga la primera prenda desde el panel admin y se mostrara aca para los usuarios."
             />
           </section>
         )}
@@ -189,7 +189,7 @@ export default async function Home() {
           >
             <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">
-                Productos
+                Prendas
               </p>
               <h2 className="text-2xl font-semibold tracking-tight">Catalogo</h2>
             </div>

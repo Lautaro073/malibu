@@ -3,7 +3,7 @@ import { Package, Settings, Tags } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const TABS = [
-  { id: "products", label: "Productos", icon: Package },
+  { id: "products", label: "Prendas", icon: Package },
   { id: "categories", label: "Categorias", icon: Tags },
   { id: "settings", label: "Ajustes", icon: Settings },
 ] as const;

@@ -19,7 +19,7 @@ export function formatOrderDate(value: string | null | undefined): string {
 }
 
 export function formatOrderItemCount(count: number): string {
-  return count === 1 ? "1 producto" : `${count} productos`;
+  return count === 1 ? "1 prenda" : `${count} prendas`;
 }
 
 export function getOrderCustomerStatusLabel(order: Pick<OrderSummary, "status" | "payment_status">): string {

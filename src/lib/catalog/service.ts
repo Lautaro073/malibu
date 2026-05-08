@@ -910,7 +910,7 @@ export async function deleteCategory(id: string): Promise<DeleteResponse> {
   if (!linkedProductsSnapshot.empty) {
     throw createHttpError(
       409,
-      "No se puede eliminar la categoria porque tiene productos asociados."
+      "No se puede eliminar la categoria porque tiene prendas asociadas."
     );
   }
 

@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { useRef, useState, type ChangeEvent, type DragEvent, type FormEvent } from "react";
-import { Check, ChevronDown, FileImage, LoaderCircle, Pencil, Plus, Save, Search, Trash2 } from "lucide-react";
+import { Check, ChevronDown, FileImage, LoaderCircle, Pencil, Plus, Save, Search, SlidersHorizontal, Trash2 } from "lucide-react";
 import type {
   Product,
   ProductFormState,
@@ -99,6 +99,12 @@ export function ProductPanel({
   const ITEMS_PER_PAGE = 11;
   const [prevEditingProductId, setPrevEditingProductId] = useState(editingProductId);
 
+  // Estados de filtros premium locales
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [selectedStockStatus, setSelectedStockStatus] = useState("all");
+  const [selectedPromoStatus, setSelectedPromoStatus] = useState("all");
+  const [showFilters, setShowFilters] = useState(false);
+
   if (editingProductId !== prevEditingProductId) {
     setPrevEditingProductId(editingProductId);
     if (editingProductId) {
@@ -108,9 +114,23 @@ export function ProductPanel({
     }
   }
 
+  // Filtrado local multi-capa
+  const localFilteredProducts = filteredProducts.filter((product) => {
+    const matchesCategory = selectedCategory === "all" || product.id_categoria === selectedCategory;
+    
+    const matchesStock = selectedStockStatus === "all" || 
+      (selectedStockStatus === "in-stock" && product.stock > 0) ||
+      (selectedStockStatus === "out-of-stock" && product.stock === 0);
+      
+    const matchesPromo = selectedPromoStatus === "all" ||
+      (selectedPromoStatus === "promo" && product.tiene_promocion) ||
+      (selectedPromoStatus === "regular" && !product.tiene_promocion);
+      
+    return matchesCategory && matchesStock && matchesPromo;
+  });
 
-  const totalPages = Math.ceil(filteredProducts.length / ITEMS_PER_PAGE);
-  const paginatedProducts = filteredProducts.slice(
+  const totalPages = Math.ceil(localFilteredProducts.length / ITEMS_PER_PAGE);
+  const paginatedProducts = localFilteredProducts.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   );
@@ -205,7 +225,7 @@ export function ProductPanel({
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle>
-                    {editingProductId ? "Actualizar Producto" : "Agregar Producto"}
+                    {editingProductId ? "Actualizar Prenda" : "Agregar Prenda"}
                   </CardTitle>
                   <CardDescription>
                     Cargar Prendas.
@@ -623,7 +643,7 @@ export function ProductPanel({
               ) : (
                 <Button className="w-full" type="submit" disabled={isPending || categories.length === 0}>
                   {productSubmitting ? <LoaderCircle className="animate-spin" /> : <Plus />}
-                  {productSubmitting ? "Guardando..." : "Agregar Producto"}
+                  {productSubmitting ? "Guardando..." : "Agregar Prenda"}
                 </Button>
               )}
             </CardFooter>
@@ -633,21 +653,144 @@ export function ProductPanel({
 
       <div className="lg:col-span-2">
         <Card className="flex h-[1053px] flex-col overflow-hidden rounded-md border-zinc-300 shadow-none">
-          <CardHeader className="border-b border-zinc-200 pb-3">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <CardTitle>Productos ({products.length})</CardTitle>
-              <div className="relative w-full sm:w-64">
-                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
-                <Input
-                  value={productFilter}
-                  onChange={(event) => {
-                    onFilterChange(event.target.value);
-                    setCurrentPage(1);
-                  }}
-                  placeholder="Buscar productos..."
-                  className="pl-9"
-                />
+          <CardHeader className="border-b border-zinc-200 pb-4">
+            <div className="flex flex-col gap-3.5">
+              {/* Título y Contador */}
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg font-bold text-zinc-900">
+                  Prendas ({localFilteredProducts.length})
+                </CardTitle>
               </div>
+
+              {/* Fila Principal: Búsqueda y Botón de Filtros */}
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
+                  <Input
+                    value={productFilter}
+                    onChange={(event) => {
+                      onFilterChange(event.target.value);
+                      setCurrentPage(1);
+                    }}
+                    placeholder="Buscar prendas por nombre..."
+                    className="pl-9 h-9 rounded-md border-zinc-300 focus:border-black focus:ring-0 text-xs w-full"
+                  />
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowFilters(!showFilters)}
+                  className={cn(
+                    "h-9 gap-2 text-xs font-semibold px-4 border-zinc-300 hover:bg-zinc-50 hover:text-black transition-all rounded-md shrink-0",
+                    showFilters && "border-black bg-zinc-50 text-black",
+                    (selectedCategory !== "all" || selectedStockStatus !== "all" || selectedPromoStatus !== "all") && "border-black text-black bg-zinc-50"
+                  )}
+                >
+                  <SlidersHorizontal className="size-3.5" />
+                  <span>Filtros</span>
+                  {(selectedCategory !== "all" || selectedStockStatus !== "all" || selectedPromoStatus !== "all") && (
+                    <span className="ml-1 inline-flex size-5 items-center justify-center rounded-full bg-black text-[10px] font-bold text-white">
+                      {(selectedCategory !== "all" ? 1 : 0) + (selectedStockStatus !== "all" ? 1 : 0) + (selectedPromoStatus !== "all" ? 1 : 0)}
+                    </span>
+                  )}
+                </Button>
+              </div>
+
+              {/* Panel de Filtros Colapsable */}
+              {showFilters && (
+                <div className="animate-in fade-in slide-in-from-top-2 duration-200 rounded-md border border-zinc-200 bg-zinc-50 p-3.5">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    {/* Filtro Categoría */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">
+                        Categoría
+                      </label>
+                      <div className="relative">
+                        <select
+                          value={selectedCategory}
+                          onChange={(e) => {
+                            setSelectedCategory(e.target.value);
+                            setCurrentPage(1);
+                          }}
+                          className="appearance-none h-9 w-full rounded-md border border-zinc-300 bg-white pl-3 pr-8 text-xs font-medium text-zinc-700 outline-none transition hover:border-zinc-400 focus:border-black cursor-pointer"
+                        >
+                          <option value="all">Todas las Categorías</option>
+                          {categories.map((cat) => (
+                            <option key={cat.id_categoria} value={cat.id_categoria}>
+                              {cat.nombre_categoria}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
+                      </div>
+                    </div>
+
+                    {/* Filtro Stock */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">
+                        Disponibilidad
+                      </label>
+                      <div className="relative">
+                        <select
+                          value={selectedStockStatus}
+                          onChange={(e) => {
+                            setSelectedStockStatus(e.target.value);
+                            setCurrentPage(1);
+                          }}
+                          className="appearance-none h-9 w-full rounded-md border border-zinc-300 bg-white pl-3 pr-8 text-xs font-medium text-zinc-700 outline-none transition hover:border-zinc-400 focus:border-black cursor-pointer"
+                        >
+                          <option value="all">Todos los Stocks</option>
+                          <option value="in-stock">Con Stock</option>
+                          <option value="out-of-stock">Sin Stock</option>
+                        </select>
+                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
+                      </div>
+                    </div>
+
+                    {/* Filtro Promoción */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">
+                        Estado de Precio
+                      </label>
+                      <div className="relative">
+                        <select
+                          value={selectedPromoStatus}
+                          onChange={(e) => {
+                            setSelectedPromoStatus(e.target.value);
+                            setCurrentPage(1);
+                          }}
+                          className="appearance-none h-9 w-full rounded-md border border-zinc-300 bg-white pl-3 pr-8 text-xs font-medium text-zinc-700 outline-none transition hover:border-zinc-400 focus:border-black cursor-pointer"
+                        >
+                          <option value="all">Todos los Precios</option>
+                          <option value="promo">En Promoción</option>
+                          <option value="regular">Precio Normal</option>
+                        </select>
+                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Acciones de Limpieza */}
+                  {(selectedCategory !== "all" || selectedStockStatus !== "all" || selectedPromoStatus !== "all") && (
+                    <div className="mt-3 flex items-center justify-end border-t border-zinc-200 pt-2.5">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedCategory("all");
+                          setSelectedStockStatus("all");
+                          setSelectedPromoStatus("all");
+                          setCurrentPage(1);
+                        }}
+                        className="h-8 text-xs font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-3 rounded-md"
+                      >
+                        Limpiar todos los filtros
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </CardHeader>
 
@@ -746,7 +889,7 @@ export function ProductPanel({
                 ) : (
                   <TableRow>
                     <TableCell colSpan={6} className="h-24 text-center text-zinc-500">
-                      {productFilter ? "No hay productos que coincidan con la busqueda." : "No hay productos disponibles."}
+                      {productFilter ? "No hay prendas que coincidan con la busqueda." : "No hay prendas disponibles."}
                     </TableCell>
                   </TableRow>
                 )}

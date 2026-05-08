@@ -242,7 +242,7 @@ export function ProductGridCarouselClient({
           )}
         >
           <ChevronLeft className="size-5" />
-          <span className="sr-only">Ver productos anteriores</span>
+          <span className="sr-only">Ver prendas anteriores</span>
         </button>
 
         <button
@@ -254,7 +254,7 @@ export function ProductGridCarouselClient({
           )}
         >
           <ChevronRight className="size-5" />
-          <span className="sr-only">Ver mas productos</span>
+          <span className="sr-only">Ver mas prendas</span>
         </button>
       </div>
 

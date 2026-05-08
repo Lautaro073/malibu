@@ -196,7 +196,7 @@ export default async function ProductPage(
                 Relacionados
               </p>
               <h2 className="text-2xl font-semibold tracking-tight">
-                Mas productos de esta categoria
+                Mas prendas de esta categoria
               </h2>
             </div>
 

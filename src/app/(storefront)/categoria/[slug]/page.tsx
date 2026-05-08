@@ -52,7 +52,7 @@ export async function generateMetadata(
   }
 
   const title = `${currentCategory.nombre_categoria} | Malibú`;
-  const description = `Explora ${currentCategory.nombre_categoria} en Malibú. Mira precios, stock y productos disponibles de esta categoria.`;
+  const description = `Explora ${currentCategory.nombre_categoria} en Malibú. Mira precios, stock y prendas disponibles de esta categoria.`;
 
   return {
     title,
@@ -105,7 +105,7 @@ export default async function CategoryPage(
             {currentCategory.nombre_categoria}
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-7 text-zinc-600">
-            Productos disponibles dentro de esta seccion.
+            Prendas disponibles dentro de esta seccion.
           </p>
         </section>
 
@@ -117,7 +117,7 @@ export default async function CategoryPage(
           />
         ) : (
           <EmptyCatalogState
-            title="Esta categoria no tiene productos"
+            title="Esta categoria no tiene prendas"
             description="El cliente puede ver la categoria, pero todavia no hay items cargados dentro de ella."
           />
         )}

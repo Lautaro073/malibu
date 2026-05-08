@@ -394,7 +394,7 @@ export function CartDrawer() {
             <div className="flex h-full min-h-56 flex-col items-center justify-center rounded-2xl border border-dashed border-zinc-200 bg-zinc-50 px-5 text-center">
               <ShoppingBag className="mb-3 size-8 text-zinc-400" />
               <p className="text-sm font-medium text-black">Tu carrito esta vacio</p>
-              <p className="mt-1 text-sm text-zinc-500">Sumá productos y los vas a ver acá.</p>
+              <p className="mt-1 text-sm text-zinc-500">Sumá prendas y las vas a ver acá.</p>
             </div>
           )}
         </div>

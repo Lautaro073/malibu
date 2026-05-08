@@ -339,7 +339,7 @@ export function StoreHeader({ initialPromoBanner = null }: StoreHeaderProps) {
         aria-controls={desktopSearchResultsId}
       >
         <label htmlFor={desktopSearchInputId} className="sr-only">
-          Buscar productos
+          Buscar prendas
         </label>
         <Input
           id={desktopSearchInputId}
@@ -352,7 +352,7 @@ export function StoreHeader({ initialPromoBanner = null }: StoreHeaderProps) {
             }
           }}
           onKeyDown={handleSearchInputKeyDown}
-          placeholder="Buscar productos..."
+          placeholder="Buscar prendas..."
           aria-autocomplete="list"
           aria-controls={desktopSearchResultsId}
           aria-activedescendant={
@@ -389,7 +389,7 @@ export function StoreHeader({ initialPromoBanner = null }: StoreHeaderProps) {
         {isMobileSearchVisible ? (
           <>
             <label htmlFor={mobileSearchInputId} className="sr-only">
-              Buscar productos
+              Buscar prendas
             </label>
             <Input
               id={mobileSearchInputId}
@@ -438,7 +438,7 @@ export function StoreHeader({ initialPromoBanner = null }: StoreHeaderProps) {
             className="flex h-10 w-10 items-center justify-center text-zinc-600 transition hover:text-black"
           >
             <Search className="size-5" />
-            <span className="sr-only">Buscar productos</span>
+            <span className="sr-only">Buscar prendas</span>
           </button>
         )}
       </div>
@@ -481,7 +481,7 @@ export function StoreHeader({ initialPromoBanner = null }: StoreHeaderProps) {
 
           {!searchError && !isSearching && searchResults.length === 0 ? (
             <div className="rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-4 text-sm text-zinc-600">
-              No encontramos productos para {searchTerm.trim()}.
+              No encontramos prendas para {searchTerm.trim()}.
             </div>
           ) : null}
 
@@ -626,7 +626,7 @@ export function StoreHeader({ initialPromoBanner = null }: StoreHeaderProps) {
                 >
                   <Plus />
                   <span className="sr-only">
-                    {product.medidas.length > 0 ? "Ver producto" : "Agregar producto"}
+                    {product.medidas.length > 0 ? "Ver prenda" : "Agregar prenda"}
                   </span>
                 </Button>
               </div>

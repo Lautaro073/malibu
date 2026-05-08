@@ -52,7 +52,7 @@ export default async function CustomerOrderDetailPage(
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)] lg:items-start">
         <Card className="rounded-[1.5rem] border-zinc-200 shadow-none">
           <CardHeader>
-            <CardTitle>Productos</CardTitle>
+            <CardTitle>Prendas</CardTitle>
             <CardDescription>Detalle de lo incluido en el pedido.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">

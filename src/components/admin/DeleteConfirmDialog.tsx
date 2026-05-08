@@ -32,8 +32,8 @@ export function DeleteConfirmDialog({
     targetType === "category" ? "Eliminar categoria" : "Eliminar producto";
   const description =
     targetType === "category"
-      ? "Si esta categoria tiene productos asociados, no se podra eliminar."
-      : "Esta accion elimina el producto del catalogo.";
+      ? "Si esta categoria tiene prendas asociadas, no se podra eliminar."
+      : "Esta accion elimina la prenda del catalogo.";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

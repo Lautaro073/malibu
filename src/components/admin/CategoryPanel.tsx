@@ -1,5 +1,5 @@
 import { useState, type ChangeEvent, type FormEvent } from "react";
-import { ChevronDown, LoaderCircle, Pencil, Plus, Save, Trash2 } from "lucide-react";
+import { ChevronDown, LoaderCircle, Pencil, Plus, Save, Search, Trash2 } from "lucide-react";
 import type { Category, CategoryFormState } from "@/types/domain";
 import { Button } from "@/components/ui/button";
 import {
@@ -52,6 +52,7 @@ export function CategoryPanel({
   const [currentPage, setCurrentPage] = useState(1);
   const [formOpen, setFormOpen] = useState(false);
   const [prevEditingCategoryId, setPrevEditingCategoryId] = useState(editingCategoryId);
+  const [searchQuery, setSearchQuery] = useState("");
 
   if (editingCategoryId !== prevEditingCategoryId) {
     setPrevEditingCategoryId(editingCategoryId);
@@ -66,8 +67,12 @@ export function CategoryPanel({
     onFieldChange("nombre_categoria", event.target.value);
   };
 
-  const totalPages = Math.ceil(categories.length / ITEMS_PER_PAGE);
-  const paginatedCategories = categories.slice(
+  const filteredCategories = categories.filter((category) =>
+    category.nombre_categoria.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const totalPages = Math.ceil(filteredCategories.length / ITEMS_PER_PAGE);
+  const paginatedCategories = filteredCategories.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   );
@@ -147,7 +152,21 @@ export function CategoryPanel({
       <div className="lg:col-span-2">
         <Card className="flex flex-col overflow-hidden rounded-md border-zinc-300 shadow-none">
           <CardHeader className="border-b border-zinc-200 pb-3">
-            <CardTitle>Categorias ({categories.length})</CardTitle>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <CardTitle>Categorias ({filteredCategories.length})</CardTitle>
+              <div className="relative w-full sm:w-64">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
+                <Input
+                  value={searchQuery}
+                  onChange={(event) => {
+                    setSearchQuery(event.target.value);
+                    setCurrentPage(1);
+                  }}
+                  placeholder="Buscar categorias..."
+                  className="pl-9 h-9 rounded-md border-zinc-300 focus:border-black focus:ring-0 text-xs w-full"
+                />
+              </div>
+            </div>
           </CardHeader>
 
           <CardContent className="min-h-0 flex-1">
