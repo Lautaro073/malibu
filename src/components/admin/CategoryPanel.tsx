@@ -85,8 +85,9 @@ export function CategoryPanel({
             className="cursor-pointer border-b border-zinc-200 pb-4 lg:cursor-default"
             onClick={() => setFormOpen((prev) => !prev)}
           >
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div className="flex items-center justify-between">
+            <div className="flex w-full items-center justify-between gap-4">
+              {/* Contenido Principal: Título y Botón Opcional */}
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <div>
                   <CardTitle>
                     {editingCategoryId ? "Actualizar Categoria" : "Agregar Categoria"}
@@ -95,20 +96,28 @@ export function CategoryPanel({
                     {editingCategoryId ? "Actualizar la Categoria" : "Agregar nueva Categoria"}
                   </CardDescription>
                 </div>
-                <ChevronDown
-                  className={cn(
-                    "size-5 shrink-0 text-zinc-500 transition-transform lg:hidden",
-                    formOpen && "rotate-180"
-                  )}
-                />
+
+                {editingCategoryId ? (
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    className="h-9 w-fit text-xs shrink-0 gap-1.5" 
+                    onClick={(e) => { e.stopPropagation(); onCancel(); }}
+                  >
+                    <Plus className="size-3.5" />
+                    <span>Volver a agregar</span>
+                  </Button>
+                ) : null}
               </div>
 
-              {editingCategoryId ? (
-                <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={(e) => { e.stopPropagation(); onCancel(); }}>
-                  <Plus />
-                  Volver a agregar
-                </Button>
-              ) : null}
+              {/* Chevron de Expandir siempre al final */}
+              <ChevronDown
+                className={cn(
+                  "size-5 shrink-0 text-zinc-500 transition-transform",
+                  formOpen && "rotate-180",
+                  "lg:hidden"
+                )}
+              />
             </div>
           </CardHeader>
 

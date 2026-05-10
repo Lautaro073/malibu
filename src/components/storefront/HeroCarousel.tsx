@@ -84,7 +84,7 @@ export function HeroCarousel({ initialSlides = DEFAULT_SLIDES, initialEnabled = 
   }
 
   return (
-    <section 
+    <section
       className="relative w-full aspect-[3/4] sm:aspect-auto sm:h-[60vh] bg-zinc-900 overflow-hidden border-b border-zinc-200"
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
@@ -98,21 +98,20 @@ export function HeroCarousel({ initialSlides = DEFAULT_SLIDES, initialEnabled = 
           return (
             <div
               key={index}
-              className={`absolute inset-0 w-full h-full transition-all duration-1000 ease-out flex items-center justify-center ${
-                isActive 
-                  ? "opacity-100 translate-x-0 pointer-events-auto z-10" 
+              className={`absolute inset-0 w-full h-full transition-all duration-1000 ease-out flex items-center justify-center ${isActive
+                  ? "opacity-100 translate-x-0 pointer-events-auto z-10"
                   : "opacity-0 translate-x-full pointer-events-none z-0"
-              }`}
+                }`}
             >
               {/* Imagen de fondo */}
-              <div 
+              <div
                 className="absolute inset-0 bg-cover bg-center transition-transform duration-1000 ease-out scale-105"
-                style={{ 
+                style={{
                   backgroundImage: `url(${slide.image})`,
                   transform: isActive ? "scale(1)" : "scale(1.05)"
                 }}
               />
-              
+
               {/* Overlay oscuro para legibilidad superior (solo si tiene texto) */}
               {hasText ? (
                 <div className="absolute inset-0 bg-linear-to-t from-black/60 via-black/20 to-black/30" />
@@ -162,11 +161,10 @@ export function HeroCarousel({ initialSlides = DEFAULT_SLIDES, initialEnabled = 
               <button
                 key={index}
                 onClick={() => setCurrentIndex(index)}
-                className={`h-1.5 rounded-full transition-all duration-300 ${
-                  index === currentIndex 
-                    ? "w-7 bg-white" 
+                className={`h-1.5 rounded-full transition-all duration-300 ${index === currentIndex
+                    ? "w-7 bg-white"
                     : "w-1.5 bg-white/40 hover:bg-white/70"
-                }`}
+                  }`}
                 aria-label={`Ir al slide ${index + 1}`}
               />
             ))}
