@@ -2,6 +2,23 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { isCloudinaryImageUrl } from "@/lib/images";
+
+function getHeroImageUrl(src: string, format: "desktop" | "mobile"): string {
+  if (!isCloudinaryImageUrl(src)) return src;
+  
+  if (format === "desktop") {
+    // Desktop: Forzamos una relación de aspecto ultra-ancha (3:1)
+    // Esto garantiza que en monitores normales el navegador siempre recorte 
+    // los laterales (inventados por IA) en lugar de recortar el alto (la prenda).
+    const transformations = ["f_auto", "q_auto:eco", "ar_3:1", "c_pad", "b_gen_fill"];
+    return src.replace("/upload/", `/upload/${transformations.join(",")}/`);
+  } else {
+    // Mobile: optimización estándar
+    const transformations = ["f_auto", "q_auto:eco", "c_limit", "w_1080"];
+    return src.replace("/upload/", `/upload/${transformations.join(",")}/`);
+  }
+}
 
 interface Slide {
   image: string;
@@ -85,7 +102,7 @@ export function HeroCarousel({ initialSlides = DEFAULT_SLIDES, initialEnabled = 
 
   return (
     <section
-      className="relative w-full aspect-[3/4] sm:aspect-auto sm:h-[60vh] bg-zinc-900 overflow-hidden border-b border-zinc-200"
+      className="relative w-full aspect-[3/4] sm:aspect-auto sm:h-[calc(100dvh-150px)] bg-zinc-900 overflow-hidden border-b border-zinc-200"
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
@@ -103,11 +120,20 @@ export function HeroCarousel({ initialSlides = DEFAULT_SLIDES, initialEnabled = 
                   : "opacity-0 translate-x-full pointer-events-none z-0"
                 }`}
             >
-              {/* Imagen de fondo */}
+              {/* Imagen de fondo Mobile (Original vertical optimizada) */}
               <div
-                className="absolute inset-0 bg-cover bg-center transition-transform duration-1000 ease-out scale-105"
+                className="absolute inset-0 bg-cover bg-center transition-transform duration-1000 ease-out scale-105 sm:hidden"
                 style={{
-                  backgroundImage: `url(${slide.image})`,
+                  backgroundImage: `url(${getHeroImageUrl(slide.image, "mobile")})`,
+                  transform: isActive ? "scale(1)" : "scale(1.05)"
+                }}
+              />
+
+              {/* Imagen de fondo Desktop (Expandida por IA Relleno Generativo) */}
+              <div
+                className="absolute inset-0 bg-cover bg-center transition-transform duration-1000 ease-out scale-105 hidden sm:block"
+                style={{
+                  backgroundImage: `url(${getHeroImageUrl(slide.image, "desktop")})`,
                   transform: isActive ? "scale(1)" : "scale(1.05)"
                 }}
               />
