@@ -373,6 +373,29 @@ export interface OrderSummary {
   updated_at: string | null;
 }
 
+export type AdminExpenseCategory =
+  | "mercaderia"
+  | "servicios"
+  | "insumos"
+  | "local"
+  | "otros";
+
+export interface RawAdminExpenseRecord {
+  id: string;
+  concept: string;
+  amount: number | string | null;
+  category: AdminExpenseCategory;
+  createdAt?: FirebaseDateLike;
+}
+
+export interface AdminExpense {
+  id_gasto: string;
+  concepto: string;
+  monto: number;
+  categoria: AdminExpenseCategory;
+  created_at: string | null;
+}
+
 export interface CartExistsResponse {
   exists: boolean;
 }

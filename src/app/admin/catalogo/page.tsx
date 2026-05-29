@@ -9,6 +9,7 @@ import { CategoryPanel } from "@/components/admin/CategoryPanel";
 import { ProductPanel } from "@/components/admin/ProductPanel";
 import { OrdersPanel } from "@/components/admin/OrdersPanel";
 import { SettingsPanel } from "@/components/admin/SettingsPanel";
+import { StatisticsPanel } from "@/components/admin/StatisticsPanel";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAdminCatalog } from "@/hooks/useAdminCatalog";
 
@@ -84,6 +85,16 @@ export default function AdminCatalogPage() {
               products={admin.products}
               orderSubmittingId={admin.orderSubmittingId}
               onUpdateStatus={admin.updateOrderStatus}
+            />
+          }
+          statisticsContent={
+            <StatisticsPanel
+              expenses={admin.expenses}
+              expenseDeletingId={admin.expenseDeletingId}
+              expenseSubmitting={admin.expenseSubmitting}
+              orders={admin.orders}
+              onCreateExpense={admin.createExpense}
+              onDeleteExpense={admin.deleteExpense}
             />
           }
           categoriesContent={

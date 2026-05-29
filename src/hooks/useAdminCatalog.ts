@@ -17,6 +17,8 @@ import type { AdminTab } from "@/components/admin/AdminTabs";
 import type {
   Category,
   CategoryFormState,
+  AdminExpense,
+  AdminExpenseCategory,
   ErrorResponseBody,
   OrderSummary,
   ProductImageAsset,
@@ -121,6 +123,7 @@ interface UseAdminCatalogResult {
   categories: Category[];
   products: Product[];
   orders: OrderSummary[];
+  expenses: AdminExpense[];
   filteredProducts: Product[];
   productFilter: string;
   setProductFilter: (value: string) => void;
@@ -132,6 +135,8 @@ interface UseAdminCatalogResult {
   categorySubmitting: boolean;
   productSubmitting: boolean;
   orderSubmittingId: string;
+  expenseSubmitting: boolean;
+  expenseDeletingId: string;
   deleteDialogOpen: boolean;
   deleteDialogType: "category" | "product" | null;
   deleteDialogLabel: string;
@@ -166,6 +171,12 @@ interface UseAdminCatalogResult {
   restoreCategory: (category: Category) => void;
   restoreProduct: (product: Product) => void;
   updateOrderStatus: (orderId: string, status: "confirmed" | "cancelled") => void;
+  createExpense: (input: {
+    categoria: AdminExpenseCategory;
+    concepto: string;
+    monto: string;
+  }) => void;
+  deleteExpense: (expenseId: string) => void;
   closeDeleteDialog: () => void;
   confirmDelete: () => void;
   logout: () => void;
@@ -253,6 +264,7 @@ export function useAdminCatalog(): UseAdminCatalogResult {
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<OrderSummary[]>([]);
+  const [expenses, setExpenses] = useState<AdminExpense[]>([]);
   const [productFilter, setProductFilter] = useState("");
   const deferredProductFilter = useDeferredValue(productFilter);
   const [editingCategoryId, setEditingCategoryId] = useState("");
@@ -268,6 +280,8 @@ export function useAdminCatalog(): UseAdminCatalogResult {
     | "product-submit"
     | "logout"
     | `order:${string}`
+    | "expense-submit"
+    | `expense-delete:${string}`
     | `restore-category:${string}`
     | `restore-product:${string}`
     | null
@@ -347,6 +361,24 @@ export function useAdminCatalog(): UseAdminCatalogResult {
     setOrders(sortOrders(nextOrders as OrderSummary[]));
   }, [auth]);
 
+  const loadExpenses = useCallback(async (currentAuth?: Auth): Promise<void> => {
+    const resolvedAuth = currentAuth ?? auth;
+
+    if (!resolvedAuth) {
+      return;
+    }
+
+    const response = await authorizedFetch(resolvedAuth, "/api/admin/expenses");
+    const payload = await parseJson<{ expenses?: AdminExpense[] } | ErrorResponseBody>(response);
+
+    if (!response.ok) {
+      throw new Error(getResponseErrorMessage(payload, "No se pudieron cargar los gastos."));
+    }
+
+    const nextExpenses = isRecord(payload) && Array.isArray(payload.expenses) ? payload.expenses : [];
+    setExpenses(nextExpenses as AdminExpense[]);
+  }, [auth]);
+
   useEffect(() => {
     let unsubscribe: () => void = () => undefined;
 
@@ -380,6 +412,7 @@ export function useAdminCatalog(): UseAdminCatalogResult {
                 await Promise.all([
                   loadCatalog(authInstance),
                   loadOrders(authInstance),
+                  loadExpenses(authInstance),
                 ]);
                 loadedUserIdRef.current = session.user.uid;
               } catch (currentError: unknown) {
@@ -405,7 +438,7 @@ export function useAdminCatalog(): UseAdminCatalogResult {
     });
 
     return () => unsubscribe();
-  }, [loadCatalog, loadOrders, router]);
+  }, [loadCatalog, loadExpenses, loadOrders, router]);
 
   function setSuccess(message: string): void {
     setNotice(message);
@@ -1089,6 +1122,82 @@ export function useAdminCatalog(): UseAdminCatalogResult {
     });
   }
 
+  function createExpense(input: {
+    categoria: AdminExpenseCategory;
+    concepto: string;
+    monto: string;
+  }): void {
+    if (!auth) {
+      return;
+    }
+
+    setPendingAction("expense-submit");
+
+    startTransition(() => {
+      void (async () => {
+        try {
+          const response = await authorizedFetch(auth, "/api/admin/expenses", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(input),
+          });
+          const payload = await parseJson<AdminExpense | ErrorResponseBody>(response);
+
+          if (!response.ok) {
+            throw new Error(getResponseErrorMessage(payload, "No se pudo agregar el gasto."));
+          }
+
+          setExpenses((current) => [payload as AdminExpense, ...current]);
+          setSuccess("Gasto agregado correctamente.");
+        } catch (currentError: unknown) {
+          setFailure(
+            isErrorWithMessage(currentError)
+              ? currentError.message
+              : "No se pudo agregar el gasto."
+          );
+        } finally {
+          setPendingAction(null);
+        }
+      })();
+    });
+  }
+
+  function deleteExpense(expenseId: string): void {
+    if (!auth) {
+      return;
+    }
+
+    setPendingAction(`expense-delete:${expenseId}`);
+
+    startTransition(() => {
+      void (async () => {
+        try {
+          const response = await authorizedFetch(auth, `/api/admin/expenses/${expenseId}`, {
+            method: "DELETE",
+          });
+          const payload = await parseJson<unknown>(response);
+
+          if (!response.ok) {
+            throw new Error(getResponseErrorMessage(payload, "No se pudo eliminar el gasto."));
+          }
+
+          setExpenses((current) => current.filter((expense) => expense.id_gasto !== expenseId));
+          setSuccess("Gasto eliminado correctamente.");
+        } catch (currentError: unknown) {
+          setFailure(
+            isErrorWithMessage(currentError)
+              ? currentError.message
+              : "No se pudo eliminar el gasto."
+          );
+        } finally {
+          setPendingAction(null);
+        }
+      })();
+    });
+  }
+
   function logout(): void {
     if (!auth) {
       return;
@@ -1111,7 +1220,7 @@ export function useAdminCatalog(): UseAdminCatalogResult {
   }
 
   function setActiveTab(value: string): void {
-    if (value === "products" || value === "categories" || value === "settings" || value === "orders") {
+    if (value === "products" || value === "categories" || value === "settings" || value === "orders" || value === "statistics") {
       setActiveTabState(value as AdminTab);
     }
   }
@@ -1135,6 +1244,7 @@ export function useAdminCatalog(): UseAdminCatalogResult {
     categories,
     products,
     orders,
+    expenses,
     filteredProducts,
     productFilter,
     setProductFilter,
@@ -1146,6 +1256,10 @@ export function useAdminCatalog(): UseAdminCatalogResult {
     categorySubmitting: pendingAction === "category-submit",
     productSubmitting: pendingAction === "product-submit",
     orderSubmittingId: pendingAction?.startsWith("order:") ? pendingAction.slice(6) : "",
+    expenseSubmitting: pendingAction === "expense-submit",
+    expenseDeletingId: pendingAction?.startsWith("expense-delete:")
+      ? pendingAction.slice("expense-delete:".length)
+      : "",
     deleteDialogOpen: Boolean(deleteTarget),
     deleteDialogType: deleteTarget?.kind || null,
     deleteDialogLabel: deleteTarget?.label || "",
@@ -1173,6 +1287,8 @@ export function useAdminCatalog(): UseAdminCatalogResult {
     restoreCategory,
     restoreProduct,
     updateOrderStatus,
+    createExpense,
+    deleteExpense,
     closeDeleteDialog,
     confirmDelete,
     logout,
