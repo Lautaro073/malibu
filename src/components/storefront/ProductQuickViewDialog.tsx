@@ -6,7 +6,8 @@ import { useRef, useState, type PointerEvent } from "react";
 import { AddToCartButton } from "@/components/storefront/AddToCartButton";
 import type { Product, ProductSearchResult } from "@/types/domain";
 import { isCloudinaryImageUrl, storefrontImageLoader } from "@/lib/images";
-import { formatCurrency, getDiscountPercentage, getProductVariants, getVariantStock } from "@/lib/storefront";
+import { formatCurrency, getDiscountPercentage, getProductVariants } from "@/lib/storefront";
+import { toggleMeasureSelection } from "@/lib/storefront/measure-selection";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -33,7 +34,7 @@ export function ProductQuickViewDialog({
   const [zoomLevel, setZoomLevel] = useState(1);
   const [imageOffset, setImageOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
-  const [selectedMeasure, setSelectedMeasure] = useState("");
+  const [selectedMeasures, setSelectedMeasures] = useState<string[]>([]);
   const discountPercentage =
     product?.tiene_promocion
       ? getDiscountPercentage(product.precio_lista, product.precio)
@@ -50,6 +51,9 @@ export function ProductQuickViewDialog({
   const images = product?.imagenes.length ? product.imagenes : product?.imagen ? [product.imagen] : [];
   const activeImage = images[activeImageIndex] || images[0] || null;
   const variants = product ? getProductVariants(product) : [];
+  const stockByMeasure = Object.fromEntries(
+    variants.map((variant) => [variant.medida, variant.stock])
+  );
 
   function clampOffset(
     nextX: number,
@@ -342,39 +346,48 @@ export function ProductQuickViewDialog({
                   <div className="space-y-1">
                     <p className="text-sm font-medium text-black">Elige tu talle</p>
                     <p className="text-sm text-zinc-500">
-                      Selecciona un talle antes de agregar.
+                      Puedes elegir uno o varios talles antes de agregar.
                     </p>
                   </div>
 
-                  <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Elige tu talle">
-                    {variants.map((variant) => (
-                      <button
-                        key={variant.medida}
-                        type="button"
-                        role="radio"
-                        aria-checked={selectedMeasure === variant.medida}
-                        onClick={() => setSelectedMeasure(variant.medida)}
-                        disabled={variant.stock <= 0}
-                        className={`rounded-full border px-4 py-2 text-sm font-medium transition ${selectedMeasure === variant.medida
-                          ? "border-black bg-black text-white"
-                          : variant.stock <= 0
-                            ? "cursor-not-allowed border-zinc-200 bg-zinc-100 text-zinc-400"
-                            : "border-zinc-300 bg-white text-black hover:border-black"
+                  <div className="flex flex-wrap gap-2" aria-label="Elige tu talle">
+                    {variants.map((variant) => {
+                      const isSelected = selectedMeasures.includes(variant.medida);
+
+                      return (
+                        <button
+                          key={variant.medida}
+                          type="button"
+                          aria-pressed={isSelected}
+                          onClick={() =>
+                            setSelectedMeasures((current) =>
+                              toggleMeasureSelection(current, variant.medida)
+                            )
+                          }
+                          disabled={variant.stock <= 0}
+                          className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
+                            isSelected
+                              ? "border-black bg-black text-white"
+                              : variant.stock <= 0
+                                ? "cursor-not-allowed border-zinc-200 bg-zinc-100 text-zinc-400"
+                                : "border-zinc-300 bg-white text-black hover:border-black"
                           }`}
-                      >
-                        {variant.medida}
-                      </button>
-                    ))}
+                        >
+                          {variant.medida}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               ) : null}
 
               <div className="flex flex-col gap-3">
                 <AddToCartButton
-                  key={selectedMeasure || "sin-talle"}
+                  key={selectedMeasures.join("-") || "sin-talle"}
                   productId={product.id_producto}
-                  stock={getVariantStock(product, selectedMeasure || null)}
-                  selectedMeasure={selectedMeasure || null}
+                  stock={product.stock}
+                  selectedMeasures={selectedMeasures}
+                  stockByMeasure={stockByMeasure}
                   requiresMeasure={product.medidas.length > 0}
                   className="w-full"
                   onAdded={() => onOpenChange(false)}

@@ -573,6 +573,42 @@ export async function getCartItems(
   return enrichItems(cart.items);
 }
 
+export async function clearCart(
+  cartId: string,
+  customerUid: string | null = null
+): Promise<DeleteResponse> {
+  const normalizedCartId = ensureCartId(cartId);
+  const db = getFirebaseAdminDb();
+
+  await db.runTransaction(async (transaction) => {
+    const ref = db.collection("carts").doc(normalizedCartId);
+    const doc = await transaction.get(ref);
+
+    if (!doc.exists) {
+      return;
+    }
+
+    const currentCart = toRawCartRecord(normalizedCartId, doc.data() ?? {});
+
+    if (currentCart.status !== "active") {
+      return;
+    }
+
+    if (currentCart.ownerType === "customer" && currentCart.customerUid !== customerUid) {
+      throw createHttpError(404, "Carrito no encontrado.");
+    }
+
+    transaction.update(ref, {
+      items: [],
+      status: "abandoned",
+      updatedAt: new Date(),
+      lastActivityAt: new Date(),
+    });
+  });
+
+  return { deleted: true };
+}
+
 export async function addOrUpdateCartItem(
   cartId: string,
   productId: string,

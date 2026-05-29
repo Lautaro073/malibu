@@ -57,6 +57,7 @@ interface StoreCartContextValue {
     selectedMeasure?: string | null
   ) => Promise<void>;
   removeItem: (productId: string, selectedMeasure?: string | null) => Promise<void>;
+  clearCart: () => Promise<void>;
 }
 
 const StoreCartContext = createContext<StoreCartContextValue | null>(null);
@@ -367,6 +368,37 @@ export function StoreCartProvider({ children }: StoreCartProviderProps) {
     [cartId]
   );
 
+  const clearCart = useCallback(async () => {
+    if (!cartId) {
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const response = await fetch(`/api/carrito/${encodeURIComponent(cartId)}`, {
+        method: "DELETE",
+        credentials: "same-origin",
+      });
+      const payload = await parseJson<{ error?: string }>(response);
+
+      if (!response.ok) {
+        throw new Error(
+          typeof payload.error === "string" ? payload.error : "No se pudo vaciar el carrito."
+        );
+      }
+
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem(CART_STORAGE_KEY);
+      }
+
+      const nextCart = await requestCartSession(null);
+      hydrateCart(nextCart);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [cartId, hydrateCart]);
+
   const quantityByLineKey = useMemo<Record<string, number>>(() => {
     const quantities: Record<string, number> = {};
 
@@ -422,11 +454,19 @@ export function StoreCartProvider({ children }: StoreCartProviderProps) {
           throw new Error(getErrorMessage(error));
         }
       },
+      clearCart: async () => {
+        try {
+          await clearCart();
+        } catch (error: unknown) {
+          throw new Error(getErrorMessage(error));
+        }
+      },
     }),
     [
       addItem,
       cartId,
       closeDrawer,
+      clearCart,
       isDrawerOpen,
       isLoading,
       isReady,

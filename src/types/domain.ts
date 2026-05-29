@@ -352,9 +352,10 @@ export interface OrderItemSummary {
 
 export interface OrderSummary {
   id_orden: string;
-  customer_uid: string;
+  customer_uid: string | null;
   checkout_session_id: string;
   cart_id: string;
+  order_source?: "checkout" | "whatsapp";
   status: "pending_confirmation" | "confirmed" | "cancelled";
   payment_status: "unpaid";
   fulfillment_status: "unfulfilled";

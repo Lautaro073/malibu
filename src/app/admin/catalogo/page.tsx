@@ -7,6 +7,7 @@ import { AdminStatus } from "@/components/admin/AdminStatus";
 import { AdminTabs } from "@/components/admin/AdminTabs";
 import { CategoryPanel } from "@/components/admin/CategoryPanel";
 import { ProductPanel } from "@/components/admin/ProductPanel";
+import { OrdersPanel } from "@/components/admin/OrdersPanel";
 import { SettingsPanel } from "@/components/admin/SettingsPanel";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAdminCatalog } from "@/hooks/useAdminCatalog";
@@ -74,6 +75,13 @@ export default function AdminCatalogPage() {
               onCancel={admin.resetProductForm}
               onEdit={admin.beginProductEdit}
               onRequestDelete={admin.requestProductDelete}
+            />
+          }
+          ordersContent={
+            <OrdersPanel
+              orders={admin.orders}
+              orderSubmittingId={admin.orderSubmittingId}
+              onUpdateStatus={admin.updateOrderStatus}
             />
           }
           categoriesContent={

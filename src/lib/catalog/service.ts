@@ -118,7 +118,7 @@ const PRODUCT_CACHE_TAG = "catalog:products";
 const SETTINGS_CACHE_TAG = "catalog:settings";
 const CATALOG_REVALIDATE_SECONDS = 300;
 
-function revalidateCatalogCache(): void {
+export function revalidateCatalogCache(): void {
   revalidateTag(CATEGORY_CACHE_TAG, "max");
   revalidateTag(PRODUCT_CACHE_TAG, "max");
   revalidateTag(SETTINGS_CACHE_TAG, "max");

@@ -1,7 +1,15 @@
+import type { DocumentData } from "firebase-admin/firestore";
 import { createHttpError } from "@/lib/api/errors";
+import { getCartItems } from "@/lib/cart/service";
+import { getProductById, revalidateCatalogCache } from "@/lib/catalog/service";
+import { serializeProduct } from "@/lib/catalog/serializers";
 import { getCheckoutSessionById } from "@/lib/checkout/service";
 import { getFirebaseAdminDb } from "@/lib/firebase/admin";
-import { getProductById } from "@/lib/catalog/service";
+import {
+  buildWhatsappOrderFingerprint,
+  shouldReuseWhatsappOrder,
+} from "@/lib/orders/idempotency";
+import { buildStockUpdateForOrderItem } from "@/lib/orders/stock";
 import type {
   CheckoutSessionItem,
   CheckoutSessionPricing,
@@ -9,6 +17,9 @@ import type {
   CustomerAddress,
   FirebaseDateLike,
   OrderSummary,
+  Product,
+  RawProductRecord,
+  SerializedCartItem,
 } from "@/types/domain";
 
 interface OrderRecord {
@@ -23,9 +34,11 @@ interface EcommerceOrderRecord {
   cartId: string;
   checkoutSessionId: string;
   createdAt: FirebaseDateLike;
-  customerUid: string;
+  customerUid: string | null;
   fulfillmentStatus: "unfulfilled";
   items: CheckoutSessionItem[];
+  orderSource?: "checkout" | "whatsapp";
+  orderFingerprint?: string | null;
   paymentStatus: "unpaid";
   pricing: CheckoutSessionPricing;
   shipping: CheckoutSessionShipping;
@@ -134,9 +147,10 @@ function serializeEcommerceOrder(
 ): OrderSummary {
   return {
     id_orden: orderId,
-    customer_uid: record.customerUid,
+    customer_uid: record.customerUid || null,
     checkout_session_id: record.checkoutSessionId,
     cart_id: record.cartId,
+    order_source: record.orderSource || "checkout",
     status: record.status,
     payment_status: record.paymentStatus,
     fulfillment_status: record.fulfillmentStatus,
@@ -147,6 +161,216 @@ function serializeEcommerceOrder(
     created_at: toIsoString(record.createdAt),
     updated_at: toIsoString(record.updatedAt),
   };
+}
+
+function serializeCartItemsForOrder(items: SerializedCartItem[]): CheckoutSessionItem[] {
+  return items.map((item) => ({
+    clave: item.clave,
+    cantidad: item.cantidad,
+    id_producto: item.id_producto,
+    imagen: item.imagen,
+    medida_seleccionada: item.medida_seleccionada,
+    nombre: item.nombre,
+    precio: item.precio,
+    precio_lista: item.precio_lista,
+    subtotal: item.precio * item.cantidad,
+    subtotal_lista: item.precio_lista * item.cantidad,
+    tiene_promocion: item.tiene_promocion,
+  }));
+}
+
+function buildOrderPricing(items: CheckoutSessionItem[]): CheckoutSessionPricing {
+  const subtotal = items.reduce((total, item) => total + item.subtotal, 0);
+  const subtotalLista = items.reduce((total, item) => total + item.subtotal_lista, 0);
+
+  return {
+    subtotal,
+    subtotal_lista: subtotalLista,
+    descuentos_total: Math.max(0, subtotalLista - subtotal),
+    shipping_total: null,
+    total: subtotal,
+  };
+}
+
+function buildWhatsappShipping(): CheckoutSessionShipping {
+  return {
+    destination_postal_code: null,
+    fulfillment_type: "pickup",
+    pickup_label: "Coordinar por WhatsApp",
+    quotes: [],
+    request: null,
+    requires_address: false,
+    selected_quote: null,
+    selected_quote_id: null,
+    status: "pending",
+  };
+}
+
+function toEcommerceOrderRecord(data: DocumentData): EcommerceOrderRecord {
+  return {
+    cartId: typeof data.cartId === "string" ? data.cartId : "",
+    checkoutSessionId: typeof data.checkoutSessionId === "string" ? data.checkoutSessionId : "",
+    createdAt: data.createdAt as FirebaseDateLike,
+    customerUid: typeof data.customerUid === "string" ? data.customerUid : null,
+    fulfillmentStatus: data.fulfillmentStatus === "unfulfilled" ? "unfulfilled" : "unfulfilled",
+    items: Array.isArray(data.items) ? (data.items as CheckoutSessionItem[]) : [],
+    orderSource: data.orderSource === "whatsapp" ? "whatsapp" : "checkout",
+    orderFingerprint: typeof data.orderFingerprint === "string" ? data.orderFingerprint : null,
+    paymentStatus: "unpaid",
+    pricing: data.pricing as CheckoutSessionPricing,
+    shipping: data.shipping as CheckoutSessionShipping,
+    addressSnapshot: (data.addressSnapshot as CustomerAddress | null) ?? null,
+    status:
+      data.status === "confirmed" || data.status === "cancelled"
+        ? data.status
+        : "pending_confirmation",
+    updatedAt: data.updatedAt as FirebaseDateLike,
+  };
+}
+
+export async function createWhatsappOrderFromCart(
+  cartId: string,
+  customerUid: string | null = null
+): Promise<OrderSummary> {
+  const normalizedCartId = ensureString(cartId, "El carrito es requerido.");
+  const items = serializeCartItemsForOrder(await getCartItems(normalizedCartId, customerUid));
+
+  if (items.length === 0) {
+    throw createHttpError(400, "El carrito no tiene productos.");
+  }
+
+  const db = getFirebaseAdminDb();
+  const orderFingerprint = buildWhatsappOrderFingerprint(items);
+  const existingSnapshot = await db
+    .collection("orders")
+    .where("cartId", "==", normalizedCartId)
+    .get();
+  const reusableOrder = existingSnapshot.docs.find((doc) => {
+    const order = toEcommerceOrderRecord(doc.data());
+    return (
+      order.orderSource === "whatsapp" &&
+      shouldReuseWhatsappOrder({
+        existingFingerprint: order.orderFingerprint || null,
+        nextFingerprint: orderFingerprint,
+        status: order.status,
+      })
+    );
+  });
+
+  if (reusableOrder) {
+    return serializeEcommerceOrder(
+      reusableOrder.id,
+      toEcommerceOrderRecord(reusableOrder.data())
+    );
+  }
+
+  const orderRef = db.collection("orders").doc();
+  const now = new Date();
+  const nextOrder: EcommerceOrderRecord = {
+    cartId: normalizedCartId,
+    checkoutSessionId: "",
+    createdAt: now,
+    customerUid,
+    fulfillmentStatus: "unfulfilled",
+    items,
+    orderSource: "whatsapp",
+    orderFingerprint,
+    paymentStatus: "unpaid",
+    pricing: buildOrderPricing(items),
+    shipping: buildWhatsappShipping(),
+    addressSnapshot: null,
+    status: "pending_confirmation",
+    updatedAt: now,
+  };
+
+  await orderRef.set(nextOrder);
+
+  const orderDoc = await orderRef.get();
+  return serializeEcommerceOrder(
+    orderRef.id,
+    toEcommerceOrderRecord(orderDoc.data() ?? nextOrder)
+  );
+}
+
+export async function listAdminOrders(): Promise<OrderSummary[]> {
+  const db = getFirebaseAdminDb();
+  const snapshot = await db.collection("orders").get();
+
+  return snapshot.docs
+    .map((doc) => serializeEcommerceOrder(doc.id, toEcommerceOrderRecord(doc.data())))
+    .sort(
+      (left, right) =>
+        new Date(right.created_at || 0).getTime() - new Date(left.created_at || 0).getTime()
+    );
+}
+
+export async function updateAdminOrderStatus(
+  orderId: string,
+  status: "confirmed" | "cancelled"
+): Promise<OrderSummary> {
+  const normalizedOrderId = ensureString(orderId, "El pedido es requerido.");
+  const db = getFirebaseAdminDb();
+  const orderRef = db.collection("orders").doc(normalizedOrderId);
+  const updatedAt = new Date();
+
+  await db.runTransaction(async (transaction) => {
+    const orderDoc = await transaction.get(orderRef);
+
+    if (!orderDoc.exists) {
+      throw createHttpError(404, "Pedido no encontrado.");
+    }
+
+    const order = toEcommerceOrderRecord(orderDoc.data() ?? {});
+
+    if (order.status === status) {
+      return;
+    }
+
+    if (order.status === "confirmed") {
+      throw createHttpError(400, "El pedido ya fue confirmado.");
+    }
+
+    if (status === "cancelled") {
+      transaction.update(orderRef, {
+        status: "cancelled",
+        updatedAt,
+      });
+      return;
+    }
+
+    for (const item of order.items) {
+      const productRef = db.collection("products").doc(item.id_producto);
+      const productDoc = await transaction.get(productRef);
+
+      if (!productDoc.exists) {
+        throw createHttpError(404, `Producto no encontrado: ${item.nombre}`);
+      }
+
+      const product = serializeProduct({
+        id: productDoc.id,
+        ...(productDoc.data() as Omit<RawProductRecord, "id">),
+      });
+      const stockUpdate = buildStockUpdateForOrderItem(product as Product, item);
+
+      transaction.update(productRef, {
+        stock: stockUpdate.stock,
+        ...(stockUpdate.variants ? { variants: stockUpdate.variants } : {}),
+        updatedAt,
+      });
+    }
+
+    transaction.update(orderRef, {
+      status: "confirmed",
+      updatedAt,
+    });
+  });
+
+  revalidateCatalogCache();
+  const orderDoc = await orderRef.get();
+  return serializeEcommerceOrder(
+    orderDoc.id,
+    toEcommerceOrderRecord(orderDoc.data() ?? {})
+  );
 }
 
 async function normalizeOrderItems(items: unknown): Promise<NormalizedOrderItem[]> {

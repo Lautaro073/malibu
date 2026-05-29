@@ -15,6 +15,8 @@ interface AddToCartButtonProps {
   productId: string;
   stock: number;
   selectedMeasure?: string | null;
+  selectedMeasures?: string[];
+  stockByMeasure?: Record<string, number>;
   requiresMeasure?: boolean;
   onAdded?: () => void;
   className?: string;
@@ -24,37 +26,61 @@ export function AddToCartButton({
   productId,
   stock,
   selectedMeasure,
+  selectedMeasures,
+  stockByMeasure,
   requiresMeasure = false,
   onAdded,
   className,
 }: AddToCartButtonProps) {
   const { addItem, getProductQuantity, isReady } = useStoreCart();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const missingMeasure = requiresMeasure && !selectedMeasure;
+  const selectedMeasureList =
+    selectedMeasures && selectedMeasures.length > 0
+      ? selectedMeasures
+      : selectedMeasure
+        ? [selectedMeasure]
+        : [];
+  const missingMeasure = requiresMeasure && selectedMeasureList.length === 0;
   const quantityInCart = getProductQuantity(productId, selectedMeasure);
-  const stockReached = stock > 0 && quantityInCart >= stock;
+  const stockReached =
+    selectedMeasureList.length > 0 && stockByMeasure
+      ? selectedMeasureList.some(
+          (measure) => getProductQuantity(productId, measure) >= (stockByMeasure[measure] ?? 0)
+        )
+      : stock > 0 && quantityInCart >= stock;
   const disabledReason = !isReady
     ? "Preparando carrito..."
-    : stock <= 0
+    : missingMeasure
+      ? "Elige un talle antes de anadir al carrito."
+    : stock <= 0 && selectedMeasureList.length === 0
       ? "Este producto no tiene stock."
       : stockReached
         ? "Ya agregaste el maximo disponible."
-      : missingMeasure
-        ? "Elige un talle antes de anadir al carrito."
         : null;
   const isDisabled = Boolean(disabledReason) || isSubmitting;
-  const idleLabel = stock <= 0
-    ? "Sin stock"
-    : stockReached
-      ? "Sin stock"
-    : missingMeasure
-      ? "Elegí un talle"
-      : "Anadir al carrito";
+  const idleLabel =
+    missingMeasure
+      ? "Elegi un talle"
+      : stock <= 0 && selectedMeasureList.length === 0
+        ? "Sin stock"
+        : stockReached
+          ? "Sin stock"
+          : selectedMeasureList.length > 1
+            ? `Anadir ${selectedMeasureList.length} talles`
+            : "Anadir al carrito";
 
   async function handleAdd(): Promise<void> {
     try {
       setIsSubmitting(true);
-      await addItem(productId, 1, selectedMeasure);
+
+      if (selectedMeasureList.length > 0) {
+        for (const measure of selectedMeasureList) {
+          await addItem(productId, 1, measure);
+        }
+      } else {
+        await addItem(productId, 1, selectedMeasure);
+      }
+
       onAdded?.();
     } catch {
       // The button is intentionally silent in card contexts.
@@ -70,11 +96,7 @@ export function AddToCartButton({
           <Tooltip>
             <TooltipTrigger asChild>
               <span className="block w-full" tabIndex={0}>
-                <Button
-                  type="button"
-                  className={className}
-                  disabled
-                >
+                <Button type="button" className={className} disabled>
                   <ShoppingBag />
                   {idleLabel}
                 </Button>

@@ -18,6 +18,7 @@ import type {
   Category,
   CategoryFormState,
   ErrorResponseBody,
+  OrderSummary,
   ProductImageAsset,
   Product,
   ProductFormState,
@@ -76,6 +77,14 @@ function sortProducts(products: Product[]): Product[] {
   );
 }
 
+function sortOrders(orders: OrderSummary[]): OrderSummary[] {
+  return [...orders].sort(
+    (left, right) =>
+      toTimestamp(right.updated_at ?? right.created_at) -
+      toTimestamp(left.updated_at ?? left.created_at)
+  );
+}
+
 function upsertCategory(categories: Category[], nextCategory: Category): Category[] {
   const withoutCurrent = categories.filter(
     (category) => category.id_categoria !== nextCategory.id_categoria
@@ -111,6 +120,7 @@ interface UseAdminCatalogResult {
   notice: string;
   categories: Category[];
   products: Product[];
+  orders: OrderSummary[];
   filteredProducts: Product[];
   productFilter: string;
   setProductFilter: (value: string) => void;
@@ -121,6 +131,7 @@ interface UseAdminCatalogResult {
   isPending: boolean;
   categorySubmitting: boolean;
   productSubmitting: boolean;
+  orderSubmittingId: string;
   deleteDialogOpen: boolean;
   deleteDialogType: "category" | "product" | null;
   deleteDialogLabel: string;
@@ -152,6 +163,7 @@ interface UseAdminCatalogResult {
   submitProduct: (event: FormEvent<HTMLFormElement>) => void;
   requestCategoryDelete: (category: Category) => void;
   requestProductDelete: (product: Product) => void;
+  updateOrderStatus: (orderId: string, status: "confirmed" | "cancelled") => void;
   closeDeleteDialog: () => void;
   confirmDelete: () => void;
   logout: () => void;
@@ -238,6 +250,7 @@ export function useAdminCatalog(): UseAdminCatalogResult {
   const [notice, setNotice] = useState("");
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [orders, setOrders] = useState<OrderSummary[]>([]);
   const [productFilter, setProductFilter] = useState("");
   const deferredProductFilter = useDeferredValue(productFilter);
   const [editingCategoryId, setEditingCategoryId] = useState("");
@@ -249,7 +262,7 @@ export function useAdminCatalog(): UseAdminCatalogResult {
   const loadedUserIdRef = useRef("");
   const [isPending, startTransition] = useTransition();
   const [pendingAction, setPendingAction] = useState<
-    "category-submit" | "product-submit" | "logout" | null
+    "category-submit" | "product-submit" | "logout" | `order:${string}` | null
   >(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [deleteError, setDeleteError] = useState("");
@@ -308,6 +321,24 @@ export function useAdminCatalog(): UseAdminCatalogResult {
     setProducts(sortProducts(payload.products));
   }, [auth]);
 
+  const loadOrders = useCallback(async (currentAuth?: Auth): Promise<void> => {
+    const resolvedAuth = currentAuth ?? auth;
+
+    if (!resolvedAuth) {
+      return;
+    }
+
+    const response = await authorizedFetch(resolvedAuth, "/api/admin/orders");
+    const payload = await parseJson<{ orders?: OrderSummary[] } | ErrorResponseBody>(response);
+
+    if (!response.ok) {
+      throw new Error(getResponseErrorMessage(payload, "No se pudieron cargar los pedidos."));
+    }
+
+    const nextOrders = isRecord(payload) && Array.isArray(payload.orders) ? payload.orders : [];
+    setOrders(sortOrders(nextOrders as OrderSummary[]));
+  }, [auth]);
+
   useEffect(() => {
     let unsubscribe: () => void = () => undefined;
 
@@ -338,7 +369,10 @@ export function useAdminCatalog(): UseAdminCatalogResult {
 
             if (loadedUserIdRef.current !== session.user.uid) {
               try {
-                await loadCatalog(authInstance);
+                await Promise.all([
+                  loadCatalog(authInstance),
+                  loadOrders(authInstance),
+                ]);
                 loadedUserIdRef.current = session.user.uid;
               } catch (currentError: unknown) {
                 setFailure(
@@ -363,7 +397,7 @@ export function useAdminCatalog(): UseAdminCatalogResult {
     });
 
     return () => unsubscribe();
-  }, [loadCatalog, router]);
+  }, [loadCatalog, loadOrders, router]);
 
   function setSuccess(message: string): void {
     setNotice(message);
@@ -912,6 +946,55 @@ export function useAdminCatalog(): UseAdminCatalogResult {
     });
   }
 
+  function updateOrderStatus(orderId: string, status: "confirmed" | "cancelled"): void {
+    if (!auth) {
+      return;
+    }
+
+    setPendingAction(`order:${orderId}`);
+
+    startTransition(() => {
+      void (async () => {
+        try {
+          const response = await authorizedFetch(auth, `/api/admin/orders/${orderId}/status`, {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ status }),
+          });
+          const payload = await parseJson<OrderSummary | ErrorResponseBody>(response);
+
+          if (!response.ok) {
+            throw new Error(getResponseErrorMessage(payload, "No se pudo actualizar el pedido."));
+          }
+
+          setOrders((current) => sortOrders(current.map((order) =>
+            order.id_orden === orderId ? (payload as OrderSummary) : order
+          )));
+
+          if (status === "confirmed") {
+            await loadCatalog(auth);
+          }
+
+          setSuccess(
+            status === "confirmed"
+              ? "Pedido confirmado y stock descontado."
+              : "Pedido marcado como no confirmado."
+          );
+        } catch (currentError: unknown) {
+          setFailure(
+            isErrorWithMessage(currentError)
+              ? currentError.message
+              : "No se pudo actualizar el pedido."
+          );
+        } finally {
+          setPendingAction(null);
+        }
+      })();
+    });
+  }
+
   function logout(): void {
     if (!auth) {
       return;
@@ -934,7 +1017,7 @@ export function useAdminCatalog(): UseAdminCatalogResult {
   }
 
   function setActiveTab(value: string): void {
-    if (value === "products" || value === "categories" || value === "settings") {
+    if (value === "products" || value === "categories" || value === "settings" || value === "orders") {
       setActiveTabState(value as AdminTab);
     }
   }
@@ -957,6 +1040,7 @@ export function useAdminCatalog(): UseAdminCatalogResult {
     notice,
     categories,
     products,
+    orders,
     filteredProducts,
     productFilter,
     setProductFilter,
@@ -967,6 +1051,7 @@ export function useAdminCatalog(): UseAdminCatalogResult {
     isPending,
     categorySubmitting: pendingAction === "category-submit",
     productSubmitting: pendingAction === "product-submit",
+    orderSubmittingId: pendingAction?.startsWith("order:") ? pendingAction.slice(6) : "",
     deleteDialogOpen: Boolean(deleteTarget),
     deleteDialogType: deleteTarget?.kind || null,
     deleteDialogLabel: deleteTarget?.label || "",
@@ -991,6 +1076,7 @@ export function useAdminCatalog(): UseAdminCatalogResult {
     submitProduct,
     requestCategoryDelete,
     requestProductDelete,
+    updateOrderStatus,
     closeDeleteDialog,
     confirmDelete,
     logout,

@@ -25,12 +25,14 @@ export function CartDrawer() {
     isLoading,
     isDrawerOpen,
     closeDrawer,
+    clearCart: clearCartFromContext,
     updateItemQuantity,
     removeItem,
   } = useStoreCart();
   const [error, setError] = useState("");
   const [shippingError, setShippingError] = useState("");
   const [shippingLoading, setShippingLoading] = useState(false);
+  const [whatsappSubmitting, setWhatsappSubmitting] = useState(false);
   const [postalCode, setPostalCode] = useState("");
   const [shippingQuotes, setShippingQuotes] = useState<ShippingQuote[]>([]);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -65,16 +67,62 @@ export function CartDrawer() {
     ].join("\n");
   }
 
-  function handleWhatsappCheckout(): void {
-    if (!whatsappPhone || items.length === 0) {
+  async function clearCartAfterWhatsapp(): Promise<void> {
+    if (typeof clearCartFromContext === "function") {
+      await clearCartFromContext();
       return;
     }
 
-    const whatsappUrl = `https://wa.me/${whatsappPhone}?text=${encodeURIComponent(
-      buildWhatsappMessage(),
-    )}`;
+    if (!cartId) {
+      return;
+    }
 
-    window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+    await fetch(`/api/carrito/${encodeURIComponent(cartId)}`, {
+      method: "DELETE",
+      credentials: "same-origin",
+    });
+
+    window.localStorage.removeItem("primera_collection_cart_id");
+    window.location.reload();
+  }
+
+  async function handleWhatsappCheckout(): Promise<void> {
+    if (!whatsappPhone || items.length === 0 || !cartId) {
+      return;
+    }
+
+    try {
+      setError("");
+      setWhatsappSubmitting(true);
+      const response = await fetch("/api/catalog-orders/from-cart", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "same-origin",
+        body: JSON.stringify({ cart_id: cartId }),
+      });
+      const payload = (await response.json()) as { error?: string };
+
+      if (!response.ok) {
+        throw new Error(payload.error || "No se pudo registrar el pedido.");
+      }
+
+      const whatsappUrl = `https://wa.me/${whatsappPhone}?text=${encodeURIComponent(
+        buildWhatsappMessage(),
+      )}`;
+
+      window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+      await clearCartAfterWhatsapp();
+    } catch (currentError: unknown) {
+      setError(
+        currentError instanceof Error
+          ? currentError.message
+          : "No se pudo registrar el pedido."
+      );
+    } finally {
+      setWhatsappSubmitting(false);
+    }
   }
 
   useEffect(() => {
@@ -463,10 +511,6 @@ export function CartDrawer() {
                 <div className="text-sm text-zinc-600">{shippingError}</div>
               ) : null}
             </div>
-          ) : items.length > 0 ? (
-            <div className="mb-4 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-3 text-sm text-zinc-600">
-              Antes de enviarte el link de pago, te confirmamos disponibilidad del talle.
-            </div>
           ) : null}
 
           <div className="space-y-2">
@@ -486,10 +530,10 @@ export function CartDrawer() {
               <Button
                 type="button"
                 className="w-full"
-                onClick={handleWhatsappCheckout}
-                disabled={items.length === 0 || !whatsappPhone}
+                onClick={() => void handleWhatsappCheckout()}
+                disabled={items.length === 0 || !whatsappPhone || whatsappSubmitting}
               >
-                Finalizar compra por WhatsApp
+                {whatsappSubmitting ? "Registrando pedido..." : "Finalizar compra por WhatsApp"}
               </Button>
             )}
 

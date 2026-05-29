@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { addOrUpdateCartItem, getCartItems } from "@/lib/cart/service";
+import { addOrUpdateCartItem, clearCart, getCartItems } from "@/lib/cart/service";
 import { toErrorResponse } from "@/lib/api/errors";
 import { getOptionalCustomer } from "@/lib/auth/customer";
 import type { RouteContext } from "@/types/next";
@@ -48,5 +48,17 @@ export async function POST(request: Request, context: RouteContext<CartParams>) 
       error,
       "Error al agregar o actualizar el producto en el carrito"
     );
+  }
+}
+
+export async function DELETE(request: Request, context: RouteContext<CartParams>) {
+  try {
+    const { id_carrito } = await context.params;
+    const customer = await getOptionalCustomer(request);
+    await clearCart(id_carrito, customer?.uid || null);
+
+    return NextResponse.json({ deleted: true });
+  } catch (error: unknown) {
+    return toErrorResponse(error, "Error al vaciar el carrito");
   }
 }
