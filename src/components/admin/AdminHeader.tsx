@@ -1,4 +1,5 @@
 import { LogOut } from "lucide-react";
+import { ActionTooltip } from "@/components/ui/action-tooltip";
 import { Button } from "@/components/ui/button";
 
 interface AdminHeaderProps {
@@ -18,16 +19,18 @@ export function AdminHeader({ email, onLogout }: AdminHeaderProps) {
         ) : null}
       </div>
 
-      <Button
-        onClick={onLogout}
-        variant="outline"
-        size="sm"
-        className="border-zinc-300 bg-white text-black hover:bg-zinc-100"
-        type="button"
-      >
-        <LogOut />
-        Cerrar sesion
-      </Button>
+      <ActionTooltip label="Salir del panel de administracion">
+        <Button
+          onClick={onLogout}
+          variant="outline"
+          size="sm"
+          className="border-zinc-300 bg-white text-black hover:bg-zinc-100"
+          type="button"
+        >
+          <LogOut />
+          Cerrar sesion
+        </Button>
+      </ActionTooltip>
     </header>
   );
 }

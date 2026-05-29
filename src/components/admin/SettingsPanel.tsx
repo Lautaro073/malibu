@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { LoaderCircle, Megaphone, Images, Save, Upload, Trash2, Plus } from "lucide-react";
+import { ActionTooltip } from "@/components/ui/action-tooltip";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -284,19 +285,21 @@ export function SettingsPanel() {
           </CardContent>
 
           <CardFooter className="border-t border-zinc-200 bg-zinc-50/50 px-6 py-4">
-            <Button type="submit" disabled={savingBanner} className="w-full sm:w-auto bg-black text-white hover:bg-zinc-900">
-              {savingBanner ? (
-                <>
-                  <LoaderCircle className="size-4 animate-spin mr-2" />
-                  Guardando...
-                </>
-              ) : (
-                <>
-                  <Save className="size-4 mr-2" />
-                  Guardar Mensaje Promocional
-                </>
-              )}
-            </Button>
+            <ActionTooltip label="Guardar el mensaje promocional de la tienda">
+              <Button type="submit" disabled={savingBanner} className="w-full sm:w-auto bg-black text-white hover:bg-zinc-900">
+                {savingBanner ? (
+                  <>
+                    <LoaderCircle className="size-4 animate-spin mr-2" />
+                    Guardando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="size-4 mr-2" />
+                    Guardar Mensaje Promocional
+                  </>
+                )}
+              </Button>
+            </ActionTooltip>
           </CardFooter>
         </form>
       </Card>
@@ -351,14 +354,15 @@ export function SettingsPanel() {
                     <div key={index} className="rounded-xl border border-zinc-200 p-5 bg-white space-y-4 relative">
                       {/* Botón de eliminar imagen (solo para index > 0) */}
                       {!isFirst && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveSlide(index)}
-                          className="absolute top-4 right-4 p-1.5 text-zinc-400 hover:text-red-500 rounded-lg hover:bg-zinc-50 transition-colors"
-                          title="Eliminar Imagen"
-                        >
-                          <Trash2 className="size-4" />
-                        </button>
+                        <ActionTooltip label="Quitar imagen del carrusel">
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveSlide(index)}
+                            className="absolute top-4 right-4 p-1.5 text-zinc-400 hover:text-red-500 rounded-lg hover:bg-zinc-50 transition-colors"
+                          >
+                            <Trash2 className="size-4" />
+                          </button>
+                        </ActionTooltip>
                       )}
 
                       <h3 className="text-sm font-semibold text-black uppercase tracking-wider flex items-center gap-2">
@@ -467,32 +471,36 @@ export function SettingsPanel() {
                 })}
 
                 {/* Botón de Agregar Imagen */}
-                <Button
-                  type="button"
-                  onClick={handleAddSlide}
-                  className="w-full py-6 border-2 border-dashed border-zinc-300 hover:border-black bg-zinc-50 hover:bg-zinc-100/50 text-zinc-600 hover:text-black flex items-center justify-center gap-2 rounded-xl transition-all shadow-none"
-                >
-                  <Plus className="size-4" />
-                  Agregar Imagen para Carrusel
-                </Button>
+                <ActionTooltip label="Agregar otra imagen al carrusel">
+                  <Button
+                    type="button"
+                    onClick={handleAddSlide}
+                    className="w-full py-6 border-2 border-dashed border-zinc-300 hover:border-black bg-zinc-50 hover:bg-zinc-100/50 text-zinc-600 hover:text-black flex items-center justify-center gap-2 rounded-xl transition-all shadow-none"
+                  >
+                    <Plus className="size-4" />
+                    Agregar Imagen para Carrusel
+                  </Button>
+                </ActionTooltip>
               </div>
             )}
           </CardContent>
 
           <CardFooter className="border-t border-zinc-200 bg-zinc-50/50 px-6 py-4">
-            <Button type="submit" disabled={savingCarousel} className="w-full sm:w-auto bg-black text-white hover:bg-zinc-900">
-              {savingCarousel ? (
-                <>
-                  <LoaderCircle className="size-4 animate-spin mr-2" />
-                  Guardando...
-                </>
-              ) : (
-                <>
-                  <Save className="size-4 mr-2" />
-                  Guardar Carrusel
-                </>
-              )}
-            </Button>
+            <ActionTooltip label="Guardar imagenes y textos del carrusel">
+              <Button type="submit" disabled={savingCarousel} className="w-full sm:w-auto bg-black text-white hover:bg-zinc-900">
+                {savingCarousel ? (
+                  <>
+                    <LoaderCircle className="size-4 animate-spin mr-2" />
+                    Guardando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="size-4 mr-2" />
+                    Guardar Carrusel
+                  </>
+                )}
+              </Button>
+            </ActionTooltip>
           </CardFooter>
         </form>
       </Card>

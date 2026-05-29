@@ -1,4 +1,5 @@
 import { LoaderCircle } from "lucide-react";
+import { ActionTooltip } from "@/components/ui/action-tooltip";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -29,11 +30,11 @@ export function DeleteConfirmDialog({
   onConfirm,
 }: DeleteConfirmDialogProps) {
   const title =
-    targetType === "category" ? "Eliminar categoria" : "Eliminar producto";
+    targetType === "category" ? "Desactivar categoria" : "Desactivar producto";
   const description =
     targetType === "category"
-      ? "Si esta categoria tiene prendas asociadas, no se podra eliminar."
-      : "Esta accion elimina la prenda del catalogo.";
+      ? "La categoria dejara de verse en la tienda. Los pedidos anteriores no cambian."
+      : "La prenda dejara de verse en la tienda. Los pedidos anteriores no cambian.";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -62,23 +63,27 @@ export function DeleteConfirmDialog({
         ) : null}
 
         <DialogFooter>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={isPending}
-          >
-            Cancelar
-          </Button>
-          <Button
-            type="button"
-            className="bg-zinc-900 hover:bg-black"
-            onClick={onConfirm}
-            disabled={isPending || !targetLabel}
-          >
-            {isPending ? <LoaderCircle className="animate-spin" /> : null}
-            {isPending ? "Eliminando..." : "Confirmar eliminacion"}
-          </Button>
+          <ActionTooltip label="Cerrar sin desactivar">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={isPending}
+            >
+              Cancelar
+            </Button>
+          </ActionTooltip>
+          <ActionTooltip label="Ocultar de la tienda sin borrar historial">
+            <Button
+              type="button"
+              className="bg-zinc-900 hover:bg-black"
+              onClick={onConfirm}
+              disabled={isPending || !targetLabel}
+            >
+              {isPending ? <LoaderCircle className="animate-spin" /> : null}
+              {isPending ? "Desactivando..." : "Desactivar"}
+            </Button>
+          </ActionTooltip>
         </DialogFooter>
       </DialogContent>
     </Dialog>

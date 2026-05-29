@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { ClipboardList, Package, Settings, Tags } from "lucide-react";
+import { ActionTooltip } from "@/components/ui/action-tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const TABS = [
@@ -35,14 +36,15 @@ export function AdminTabs({
           const Icon = tab.icon;
 
           return (
-            <TabsTrigger
-              key={tab.id}
-              value={tab.id}
-              className="gap-2 rounded-sm px-3 py-2 text-sm"
-            >
-              <Icon className="size-4 shrink-0" />
-              {tab.label}
-            </TabsTrigger>
+            <ActionTooltip key={tab.id} label={`Ir a ${tab.label.toLowerCase()}`}>
+              <TabsTrigger
+                value={tab.id}
+                className="gap-2 rounded-sm px-3 py-2 text-sm"
+              >
+                <Icon className="size-4 shrink-0" />
+                {tab.label}
+              </TabsTrigger>
+            </ActionTooltip>
           );
         })}
       </TabsList>

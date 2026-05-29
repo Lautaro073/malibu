@@ -7,8 +7,8 @@ export async function GET(request: Request) {
   try {
     await requireAdmin(request);
     const [categories, products] = await Promise.all([
-      listCategories(),
-      listAllProducts(),
+      listCategories({ includeDeleted: true }),
+      listAllProducts({ includeDeleted: true }),
     ]);
 
     return NextResponse.json({ categories, products });

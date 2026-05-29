@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { useRef, useState, type ChangeEvent, type DragEvent, type FormEvent } from "react";
-import { Check, ChevronDown, FileImage, LoaderCircle, Pencil, Plus, Save, Search, SlidersHorizontal, Trash2 } from "lucide-react";
+import { Check, ChevronDown, FileImage, LoaderCircle, Pencil, Plus, RotateCcw, Save, Search, SlidersHorizontal, Trash2 } from "lucide-react";
 import type {
   Product,
   ProductFormState,
@@ -8,6 +8,7 @@ import type {
   ProductImageAsset,
   ProductVariantFormState,
 } from "@/types/domain";
+import { ActionTooltip } from "@/components/ui/action-tooltip";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -65,6 +66,7 @@ interface ProductPanelProps {
   onCancel: () => void;
   onEdit: (product: Product) => void;
   onRequestDelete: (product: Product) => void;
+  onRestore: (product: Product) => void;
 }
 
 export function ProductPanel({
@@ -91,6 +93,7 @@ export function ProductPanel({
   onCancel,
   onEdit,
   onRequestDelete,
+  onRestore,
 }: ProductPanelProps) {
   const [isDragActive, setIsDragActive] = useState(false);
   const dragDepthRef = useRef(0);
@@ -103,6 +106,7 @@ export function ProductPanel({
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedStockStatus, setSelectedStockStatus] = useState("all");
   const [selectedPromoStatus, setSelectedPromoStatus] = useState("all");
+  const [selectedVisibilityStatus, setSelectedVisibilityStatus] = useState("active");
   const [showFilters, setShowFilters] = useState(false);
 
   if (editingProductId !== prevEditingProductId) {
@@ -116,6 +120,10 @@ export function ProductPanel({
 
   // Filtrado local multi-capa
   const localFilteredProducts = filteredProducts.filter((product) => {
+    const matchesVisibility =
+      selectedVisibilityStatus === "all" ||
+      (selectedVisibilityStatus === "active" && !product.is_deleted) ||
+      (selectedVisibilityStatus === "deleted" && product.is_deleted);
     const matchesCategory = selectedCategory === "all" || product.id_categoria === selectedCategory;
     
     const matchesStock = selectedStockStatus === "all" || 
@@ -126,7 +134,7 @@ export function ProductPanel({
       (selectedPromoStatus === "promo" && product.tiene_promocion) ||
       (selectedPromoStatus === "regular" && !product.tiene_promocion);
       
-    return matchesCategory && matchesStock && matchesPromo;
+    return matchesVisibility && matchesCategory && matchesStock && matchesPromo;
   });
 
   const totalPages = Math.ceil(localFilteredProducts.length / ITEMS_PER_PAGE);
@@ -134,6 +142,13 @@ export function ProductPanel({
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   );
+  const invisibleRowsCount =
+    paginatedProducts.length > 0 ? Math.max(0, ITEMS_PER_PAGE - paginatedProducts.length) : 0;
+  const emptyProductsMessage = productFilter
+    ? "No hay prendas que coincidan con la busqueda."
+    : selectedVisibilityStatus === "deleted"
+      ? "No hay prendas desactivadas."
+      : "No hay prendas disponibles.";
 
   const handleTextField =
     (field: keyof ProductFormState) =>
@@ -143,6 +158,14 @@ export function ProductPanel({
 
   const categoryNameById = (categoryId: string | null) =>
     categories.find((item) => item.id_categoria === categoryId)?.nombre_categoria || "";
+  const activeCategories = categories.filter((category) => !category.is_deleted);
+  const selectableCategories =
+    editingProductId && productForm.id_categoria
+      ? categories.filter(
+          (category) =>
+            !category.is_deleted || category.id_categoria === productForm.id_categoria
+        )
+      : activeCategories;
   const measureLabel =
     productForm.tipo_medida === "calzado" ? "Numeros disponibles" : "Talles disponibles";
   const measurePlaceholder =
@@ -234,15 +257,17 @@ export function ProductPanel({
                 </div>
 
                 {editingProductId ? (
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    className="h-9 w-fit text-xs shrink-0 gap-1.5" 
-                    onClick={(e) => { e.stopPropagation(); onCancel(); }}
-                  >
-                    <Plus className="size-3.5" />
-                    <span>Volver a agregar</span>
-                  </Button>
+                  <ActionTooltip label="Cancelar edicion y cargar una prenda nueva">
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      className="h-9 w-fit text-xs shrink-0 gap-1.5" 
+                      onClick={(e) => { e.stopPropagation(); onCancel(); }}
+                    >
+                      <Plus className="size-3.5" />
+                      <span>Volver a agregar</span>
+                    </Button>
+                  </ActionTooltip>
                 ) : null}
               </div>
 
@@ -345,9 +370,9 @@ export function ProductPanel({
                   required
                 >
                   <option value="">Seleccione una categoria</option>
-                  {categories.map((category) => (
+                  {selectableCategories.map((category) => (
                     <option key={category.id_categoria} value={category.id_categoria}>
-                      {category.nombre_categoria}
+                      {category.nombre_categoria}{category.is_deleted ? " (desactivada)" : ""}
                     </option>
                   ))}
                 </select>
@@ -606,20 +631,22 @@ export function ProductPanel({
                               </div>
                             </button>
                             <span className="pointer-events-none absolute inset-0 bg-black/0 transition group-hover:bg-black/10" />
-                            <Button
-                              type="button"
-                              size="icon"
-                              variant="secondary"
-                              className="absolute right-1.5 top-1.5 z-10 size-7 rounded-full opacity-100 sm:opacity-0 sm:transition sm:group-hover:opacity-100"
-                              onClick={(event) => {
-                                event.preventDefault();
-                                event.stopPropagation();
-                                onRemoveExistingImage(index);
-                              }}
-                            >
-                              <Trash2 className="size-3.5" />
-                              <span className="sr-only">Eliminar imagen {index + 1}</span>
-                            </Button>
+                            <ActionTooltip label={`Quitar imagen ${index + 1}`}>
+                              <Button
+                                type="button"
+                                size="icon"
+                                variant="secondary"
+                                className="absolute right-1.5 top-1.5 z-10 size-7 rounded-full opacity-100 sm:opacity-0 sm:transition sm:group-hover:opacity-100"
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  onRemoveExistingImage(index);
+                                }}
+                              >
+                                <Trash2 className="size-3.5" />
+                                <span className="sr-only">Eliminar imagen {index + 1}</span>
+                              </Button>
+                            </ActionTooltip>
                             {index === 0 ? (
                               <>
                                 <span className="pointer-events-none absolute inset-0 ring-1 ring-black" />
@@ -640,20 +667,26 @@ export function ProductPanel({
             <CardFooter className="flex flex-col gap-2 border-t border-zinc-200 pt-4 sm:flex-row">
               {editingProductId ? (
                 <>
-                  <Button className="w-full" type="submit" disabled={isPending || categories.length === 0}>
-                    {productSubmitting ? <LoaderCircle className="animate-spin" /> : <Save />}
-                    {productSubmitting ? "Guardando..." : "Guardar Cambios"}
-                  </Button>
-                  <Button className="w-full" variant="outline" type="button" onClick={onCancel}>
-                    <Plus />
-                    Volver a agregar
-                  </Button>
+                  <ActionTooltip label="Guardar los cambios de esta prenda">
+                    <Button className="w-full" type="submit" disabled={isPending || categories.length === 0}>
+                      {productSubmitting ? <LoaderCircle className="animate-spin" /> : <Save />}
+                      {productSubmitting ? "Guardando..." : "Guardar Cambios"}
+                    </Button>
+                  </ActionTooltip>
+                  <ActionTooltip label="Cancelar edicion y cargar una prenda nueva">
+                    <Button className="w-full" variant="outline" type="button" onClick={onCancel}>
+                      <Plus />
+                      Volver a agregar
+                    </Button>
+                  </ActionTooltip>
                 </>
               ) : (
-                <Button className="w-full" type="submit" disabled={isPending || categories.length === 0}>
-                  {productSubmitting ? <LoaderCircle className="animate-spin" /> : <Plus />}
-                  {productSubmitting ? "Guardando..." : "Agregar Prenda"}
-                </Button>
+                <ActionTooltip label="Crear una nueva prenda">
+                  <Button className="w-full" type="submit" disabled={isPending || categories.length === 0}>
+                    {productSubmitting ? <LoaderCircle className="animate-spin" /> : <Plus />}
+                    {productSubmitting ? "Guardando..." : "Agregar Prenda"}
+                  </Button>
+                </ActionTooltip>
               )}
             </CardFooter>
           </form>
@@ -686,30 +719,53 @@ export function ProductPanel({
                   />
                 </div>
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowFilters(!showFilters)}
-                  className={cn(
-                    "h-9 gap-2 text-xs font-semibold px-4 border-zinc-300 hover:bg-zinc-50 hover:text-black transition-all rounded-md shrink-0",
-                    showFilters && "border-black bg-zinc-50 text-black",
-                    (selectedCategory !== "all" || selectedStockStatus !== "all" || selectedPromoStatus !== "all") && "border-black text-black bg-zinc-50"
-                  )}
-                >
-                  <SlidersHorizontal className="size-3.5" />
-                  <span>Filtros</span>
-                  {(selectedCategory !== "all" || selectedStockStatus !== "all" || selectedPromoStatus !== "all") && (
-                    <span className="ml-1 inline-flex size-5 items-center justify-center rounded-full bg-black text-[10px] font-bold text-white">
-                      {(selectedCategory !== "all" ? 1 : 0) + (selectedStockStatus !== "all" ? 1 : 0) + (selectedPromoStatus !== "all" ? 1 : 0)}
-                    </span>
-                  )}
-                </Button>
+                <ActionTooltip label={showFilters ? "Ocultar filtros" : "Mostrar filtros"}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowFilters(!showFilters)}
+                    className={cn(
+                      "h-9 gap-2 text-xs font-semibold px-4 border-zinc-300 hover:bg-zinc-50 hover:text-black transition-all rounded-md shrink-0",
+                      showFilters && "border-black bg-zinc-50 text-black",
+                      (selectedVisibilityStatus !== "active" || selectedCategory !== "all" || selectedStockStatus !== "all" || selectedPromoStatus !== "all") && "border-black text-black bg-zinc-50"
+                    )}
+                  >
+                    <SlidersHorizontal className="size-3.5" />
+                    <span>Filtros</span>
+                    {(selectedVisibilityStatus !== "active" || selectedCategory !== "all" || selectedStockStatus !== "all" || selectedPromoStatus !== "all") && (
+                      <span className="ml-1 inline-flex size-5 items-center justify-center rounded-full bg-black text-[10px] font-bold text-white">
+                        {(selectedVisibilityStatus !== "active" ? 1 : 0) + (selectedCategory !== "all" ? 1 : 0) + (selectedStockStatus !== "all" ? 1 : 0) + (selectedPromoStatus !== "all" ? 1 : 0)}
+                      </span>
+                    )}
+                  </Button>
+                </ActionTooltip>
               </div>
 
               {/* Panel de Filtros Colapsable */}
               {showFilters && (
                 <div className="animate-in fade-in slide-in-from-top-2 duration-200 rounded-md border border-zinc-200 bg-zinc-50 p-3.5">
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">
+                        Vista
+                      </label>
+                      <div className="relative">
+                        <select
+                          value={selectedVisibilityStatus}
+                          onChange={(e) => {
+                            setSelectedVisibilityStatus(e.target.value);
+                            setCurrentPage(1);
+                          }}
+                          className="appearance-none h-9 w-full rounded-md border border-zinc-300 bg-white pl-3 pr-8 text-xs font-medium text-zinc-700 outline-none transition hover:border-zinc-400 focus:border-black cursor-pointer"
+                        >
+                          <option value="active">Activas</option>
+                          <option value="deleted">Desactivadas</option>
+                          <option value="all">Todas</option>
+                        </select>
+                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
+                      </div>
+                    </div>
+
                     {/* Filtro Categoría */}
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">
@@ -781,21 +837,24 @@ export function ProductPanel({
                   </div>
 
                   {/* Acciones de Limpieza */}
-                  {(selectedCategory !== "all" || selectedStockStatus !== "all" || selectedPromoStatus !== "all") && (
+                  {(selectedVisibilityStatus !== "active" || selectedCategory !== "all" || selectedStockStatus !== "all" || selectedPromoStatus !== "all") && (
                     <div className="mt-3 flex items-center justify-end border-t border-zinc-200 pt-2.5">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedCategory("all");
-                          setSelectedStockStatus("all");
-                          setSelectedPromoStatus("all");
-                          setCurrentPage(1);
-                        }}
-                        className="h-8 text-xs font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-3 rounded-md"
-                      >
-                        Limpiar todos los filtros
-                      </Button>
+                      <ActionTooltip label="Volver a la vista normal de prendas activas">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedCategory("all");
+                            setSelectedStockStatus("all");
+                            setSelectedPromoStatus("all");
+                            setSelectedVisibilityStatus("active");
+                            setCurrentPage(1);
+                          }}
+                          className="h-8 text-xs font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-3 rounded-md"
+                        >
+                          Limpiar todos los filtros
+                        </Button>
+                      </ActionTooltip>
                     </div>
                   )}
                 </div>
@@ -804,7 +863,7 @@ export function ProductPanel({
           </CardHeader>
 
           <CardContent className="min-h-0 flex-1 overflow-y-auto">
-            <Table className="h-full">
+            <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[260px] bg-white lg:sticky lg:left-0 lg:z-20 lg:shadow-[1px_0_0_0_#e4e4e7]">Nombre</TableHead>
@@ -818,8 +877,12 @@ export function ProductPanel({
               </TableHeader>
               <TableBody>
                 {paginatedProducts.length > 0 ? (
-                  paginatedProducts.map((product) => (
-                    <TableRow key={product.id_producto} className="group">
+                  <>
+                    {paginatedProducts.map((product) => (
+                      <TableRow
+                        key={product.id_producto}
+                        className={cn("group h-[72px]", product.is_deleted && "bg-zinc-50 text-zinc-500")}
+                      >
                       <TableCell className="max-w-[260px] bg-white font-medium group-hover:bg-zinc-50 lg:sticky lg:left-0 lg:z-20 lg:shadow-[1px_0_0_0_#e4e4e7]">
                         <div className="flex items-center gap-2">
                           {product.imagen ? (
@@ -833,7 +896,14 @@ export function ProductPanel({
                               className="size-8 shrink-0 rounded-sm object-cover"
                             />
                           ) : null}
-                          <span className="truncate" title={product.nombre}>{product.nombre}</span>
+                          <div className="min-w-0">
+                            <span className="block truncate" title={product.nombre}>{product.nombre}</span>
+                            {product.is_deleted ? (
+                              <Badge variant="secondary" className="mt-1 text-[10px]">
+                                Desactivada
+                              </Badge>
+                            ) : null}
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell className="text-center">
@@ -871,34 +941,69 @@ export function ProductPanel({
                       </TableCell>
                       <TableCell className="sticky right-0 z-20 bg-white text-right shadow-[-1px_0_0_0_#e4e4e7] group-hover:bg-zinc-50">
                         <div className="flex justify-end gap-2">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="size-8"
-                            onClick={() => onEdit(product)}
-                            type="button"
-                          >
-                            <span className="sr-only">Editar</span>
-                            <Pencil />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="size-8 hover:bg-zinc-100"
-                            onClick={() => onRequestDelete(product)}
-                            type="button"
-                          >
-                            <span className="sr-only">Eliminar</span>
-                            <Trash2 />
-                          </Button>
+                          <ActionTooltip label="Editar prenda">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="size-8"
+                              onClick={() => onEdit(product)}
+                              type="button"
+                            >
+                              <span className="sr-only">Editar</span>
+                              <Pencil />
+                            </Button>
+                          </ActionTooltip>
+                          {product.is_deleted ? (
+                            <ActionTooltip label="Reactivar prenda">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="size-8 hover:bg-zinc-100"
+                                onClick={() => onRestore(product)}
+                                type="button"
+                              >
+                                <span className="sr-only">Reactivar</span>
+                                <RotateCcw />
+                              </Button>
+                            </ActionTooltip>
+                          ) : (
+                            <ActionTooltip label="Desactivar prenda">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="size-8 hover:bg-zinc-100"
+                                onClick={() => onRequestDelete(product)}
+                                type="button"
+                              >
+                                <span className="sr-only">Desactivar</span>
+                                <Trash2 />
+                              </Button>
+                            </ActionTooltip>
+                          )}
                         </div>
                       </TableCell>
-                    </TableRow>
-                  ))
+                      </TableRow>
+                    ))}
+                    {Array.from({ length: invisibleRowsCount }).map((_, index) => (
+                      <TableRow
+                        key={`invisible-product-row-${index}`}
+                        aria-hidden="true"
+                        className="pointer-events-none h-[72px] select-none opacity-0"
+                      >
+                        <TableCell>Producto</TableCell>
+                        <TableCell>Precio</TableCell>
+                        <TableCell>Stock</TableCell>
+                        <TableCell>Categoria</TableCell>
+                        <TableCell>Medidas</TableCell>
+                        <TableCell>Tags</TableCell>
+                        <TableCell>Acciones</TableCell>
+                      </TableRow>
+                    ))}
+                  </>
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center text-zinc-500">
-                      {productFilter ? "No hay prendas que coincidan con la busqueda." : "No hay prendas disponibles."}
+                    <TableCell colSpan={7} className="h-24 text-center text-zinc-500">
+                      {emptyProductsMessage}
                     </TableCell>
                   </TableRow>
                 )}
@@ -910,22 +1015,26 @@ export function ProductPanel({
               Página {currentPage} de {totalPages || 1}
             </div>
             <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              >
-                Anterior
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={currentPage === totalPages || totalPages === 0}
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              >
-                Siguiente
-              </Button>
+              <ActionTooltip label="Ver pagina anterior">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                >
+                  Anterior
+                </Button>
+              </ActionTooltip>
+              <ActionTooltip label="Ver pagina siguiente">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage === totalPages || totalPages === 0}
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                >
+                  Siguiente
+                </Button>
+              </ActionTooltip>
             </div>
           </div>
         </Card>

@@ -2,6 +2,7 @@
 
 import { Check, X } from "lucide-react";
 import { OrderItemThumbnail } from "@/components/customer/OrderItemThumbnail";
+import { ActionTooltip } from "@/components/ui/action-tooltip";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -153,57 +154,63 @@ export function OrdersPanel({ orders, orderSubmittingId, onUpdateStatus }: Order
         ) : (
           <div className="space-y-4">
             <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
-              <button
-                type="button"
-                onClick={() => setActiveFilter("pending_confirmation")}
-                className={`rounded-md border px-2 py-2 text-left transition-colors sm:px-3 sm:py-3 ${
-                  activeFilter === "pending_confirmation"
-                    ? "border-black bg-white"
-                    : "border-zinc-200 bg-zinc-50 hover:bg-white"
-                }`}
-              >
-                <p className="truncate text-[11px] text-zinc-500 sm:text-xs">
-                  <span className="sm:hidden">Revisar</span>
-                  <span className="hidden sm:inline">Para revisar</span>
-                </p>
-                <p className="mt-0.5 text-lg font-semibold text-black sm:mt-1 sm:text-xl">
-                  {pendingCount}
-                </p>
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveFilter("confirmed")}
-                className={`rounded-md border px-2 py-2 text-left transition-colors sm:px-3 sm:py-3 ${
-                  activeFilter === "confirmed"
-                    ? "border-black bg-white"
-                    : "border-zinc-200 bg-zinc-50 hover:bg-white"
-                }`}
-              >
-                <p className="truncate text-[11px] text-zinc-500 sm:text-xs">
-                  <span className="sm:hidden">Confirmados</span>
-                  <span className="hidden sm:inline">Confirmados</span>
-                </p>
-                <p className="mt-0.5 text-lg font-semibold text-black sm:mt-1 sm:text-xl">
-                  {confirmedCount}
-                </p>
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveFilter("cancelled")}
-                className={`rounded-md border px-2 py-2 text-left transition-colors sm:px-3 sm:py-3 ${
-                  activeFilter === "cancelled"
-                    ? "border-black bg-white"
-                    : "border-zinc-200 bg-zinc-50 hover:bg-white"
-                }`}
-              >
-                <p className="truncate text-[11px] text-zinc-500 sm:text-xs">
-                  <span className="sm:hidden">Cancelados</span>
-                  <span className="hidden sm:inline">Cancelados</span>
-                </p>
-                <p className="mt-0.5 text-lg font-semibold text-black sm:mt-1 sm:text-xl">
-                  {cancelledCount}
-                </p>
-              </button>
+              <ActionTooltip label="Ver pedidos para revisar">
+                <button
+                  type="button"
+                  onClick={() => setActiveFilter("pending_confirmation")}
+                  className={`rounded-md border px-2 py-2 text-left transition-colors sm:px-3 sm:py-3 ${
+                    activeFilter === "pending_confirmation"
+                      ? "border-black bg-white"
+                      : "border-zinc-200 bg-zinc-50 hover:bg-white"
+                  }`}
+                >
+                  <p className="truncate text-[11px] text-zinc-500 sm:text-xs">
+                    <span className="sm:hidden">Revisar</span>
+                    <span className="hidden sm:inline">Para revisar</span>
+                  </p>
+                  <p className="mt-0.5 text-lg font-semibold text-black sm:mt-1 sm:text-xl">
+                    {pendingCount}
+                  </p>
+                </button>
+              </ActionTooltip>
+              <ActionTooltip label="Ver pedidos confirmados">
+                <button
+                  type="button"
+                  onClick={() => setActiveFilter("confirmed")}
+                  className={`rounded-md border px-2 py-2 text-left transition-colors sm:px-3 sm:py-3 ${
+                    activeFilter === "confirmed"
+                      ? "border-black bg-white"
+                      : "border-zinc-200 bg-zinc-50 hover:bg-white"
+                  }`}
+                >
+                  <p className="truncate text-[11px] text-zinc-500 sm:text-xs">
+                    <span className="sm:hidden">Confirmados</span>
+                    <span className="hidden sm:inline">Confirmados</span>
+                  </p>
+                  <p className="mt-0.5 text-lg font-semibold text-black sm:mt-1 sm:text-xl">
+                    {confirmedCount}
+                  </p>
+                </button>
+              </ActionTooltip>
+              <ActionTooltip label="Ver pedidos cancelados">
+                <button
+                  type="button"
+                  onClick={() => setActiveFilter("cancelled")}
+                  className={`rounded-md border px-2 py-2 text-left transition-colors sm:px-3 sm:py-3 ${
+                    activeFilter === "cancelled"
+                      ? "border-black bg-white"
+                      : "border-zinc-200 bg-zinc-50 hover:bg-white"
+                  }`}
+                >
+                  <p className="truncate text-[11px] text-zinc-500 sm:text-xs">
+                    <span className="sm:hidden">Cancelados</span>
+                    <span className="hidden sm:inline">Cancelados</span>
+                  </p>
+                  <p className="mt-0.5 text-lg font-semibold text-black sm:mt-1 sm:text-xl">
+                    {cancelledCount}
+                  </p>
+                </button>
+              </ActionTooltip>
             </div>
 
             {filteredOrders.length === 0 ? (
@@ -272,25 +279,29 @@ export function OrdersPanel({ orders, orderSubmittingId, onUpdateStatus }: Order
 
                     {isPending ? (
                       <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                        <Button
-                          type="button"
-                          className="h-11 w-full"
-                          onClick={() => onUpdateStatus(order.id_orden, "confirmed")}
-                          disabled={isSubmitting}
-                        >
-                          <Check className="size-4" />
-                          Confirmar pedido
-                        </Button>
-                        <Button
-                          type="button"
-                          className="h-11 w-full"
-                          variant="outline"
-                          onClick={() => onUpdateStatus(order.id_orden, "cancelled")}
-                          disabled={isSubmitting}
-                        >
-                          <X className="size-4" />
-                          Cancelar
-                        </Button>
+                        <ActionTooltip label="Confirmar y descontar stock">
+                          <Button
+                            type="button"
+                            className="h-11 w-full"
+                            onClick={() => onUpdateStatus(order.id_orden, "confirmed")}
+                            disabled={isSubmitting}
+                          >
+                            <Check className="size-4" />
+                            Confirmar pedido
+                          </Button>
+                        </ActionTooltip>
+                        <ActionTooltip label="Marcar como no concretado">
+                          <Button
+                            type="button"
+                            className="h-11 w-full"
+                            variant="outline"
+                            onClick={() => onUpdateStatus(order.id_orden, "cancelled")}
+                            disabled={isSubmitting}
+                          >
+                            <X className="size-4" />
+                            Cancelar
+                          </Button>
+                        </ActionTooltip>
                       </div>
                     ) : (
                       <div className="mt-4 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-3 text-sm font-medium text-zinc-700">

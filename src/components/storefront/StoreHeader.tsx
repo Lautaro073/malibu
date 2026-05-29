@@ -19,6 +19,7 @@ import { isProductSearchResultArray } from "@/lib/catalog/contracts";
 import { isEcommerceEnabled, isUserAccountsEnabled } from "@/lib/commerce-mode";
 import { isCloudinaryImageUrl, storefrontImageLoader } from "@/lib/images";
 import { formatCurrency, getDiscountPercentage, getProductHref } from "@/lib/storefront";
+import { ActionTooltip } from "@/components/ui/action-tooltip";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -414,32 +415,36 @@ export function StoreHeader({ initialPromoBanner = null }: StoreHeaderProps) {
               className="h-10 border-0 bg-transparent pr-10 pl-3 text-sm shadow-none focus-visible:ring-0"
               autoComplete="off"
             />
+            <ActionTooltip label="Cerrar busqueda">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMobileSearchVisible(false);
+                  setIsSearchOpen(false);
+                }}
+                className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-zinc-500 transition hover:text-black"
+              >
+                <X className="size-4" />
+                <span className="sr-only">Cerrar busqueda</span>
+              </button>
+            </ActionTooltip>
+          </>
+        ) : (
+          <ActionTooltip label="Buscar prendas">
             <button
               type="button"
               onClick={() => {
-                setIsMobileSearchVisible(false);
-                setIsSearchOpen(false);
+                setIsMobileSearchVisible(true);
+                if (searchTerm.trim().length >= 2) {
+                  setIsSearchOpen(true);
+                }
               }}
-              className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-zinc-500 transition hover:text-black"
+              className="flex h-10 w-10 items-center justify-center text-zinc-600 transition hover:text-black"
             >
-              <X className="size-4" />
-              <span className="sr-only">Cerrar busqueda</span>
+              <Search className="size-5" />
+              <span className="sr-only">Buscar prendas</span>
             </button>
-          </>
-        ) : (
-          <button
-            type="button"
-            onClick={() => {
-              setIsMobileSearchVisible(true);
-              if (searchTerm.trim().length >= 2) {
-                setIsSearchOpen(true);
-              }
-            }}
-            className="flex h-10 w-10 items-center justify-center text-zinc-600 transition hover:text-black"
-          >
-            <Search className="size-5" />
-            <span className="sr-only">Buscar prendas</span>
-          </button>
+          </ActionTooltip>
         )}
       </div>
     );
@@ -614,21 +619,23 @@ export function StoreHeader({ initialPromoBanner = null }: StoreHeaderProps) {
                   </button>
                 )}
 
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="secondary"
-                  className="shrink-0 rounded-full"
-                  onMouseEnter={() => setHighlightedResultIndex(index)}
-                  onClick={() => {
-                    void handleResultAction(product);
-                  }}
-                >
-                  <Plus />
-                  <span className="sr-only">
-                    {product.medidas.length > 0 ? "Ver prenda" : "Agregar prenda"}
-                  </span>
-                </Button>
+                <ActionTooltip label={product.medidas.length > 0 ? "Ver prenda" : "Agregar prenda"}>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="secondary"
+                    className="shrink-0 rounded-full"
+                    onMouseEnter={() => setHighlightedResultIndex(index)}
+                    onClick={() => {
+                      void handleResultAction(product);
+                    }}
+                  >
+                    <Plus />
+                    <span className="sr-only">
+                      {product.medidas.length > 0 ? "Ver prenda" : "Agregar prenda"}
+                    </span>
+                  </Button>
+                </ActionTooltip>
               </div>
             ))}
           </div>
@@ -636,14 +643,16 @@ export function StoreHeader({ initialPromoBanner = null }: StoreHeaderProps) {
 
         {searchResults.length > 3 ? (
           <div className="border-t border-zinc-100 px-5 py-4">
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full"
-              onClick={() => setShowAllResults((current) => !current)}
-            >
-              {showAllResults ? "Ver menos resultados" : "Ver todos los resultados"}
-            </Button>
+            <ActionTooltip label={showAllResults ? "Mostrar menos resultados" : "Mostrar todos los resultados"}>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={() => setShowAllResults((current) => !current)}
+              >
+                {showAllResults ? "Ver menos resultados" : "Ver todos los resultados"}
+              </Button>
+            </ActionTooltip>
           </div>
         ) : null}
       </div>
@@ -701,21 +710,23 @@ export function StoreHeader({ initialPromoBanner = null }: StoreHeaderProps) {
                 </Link>
               ) : null}
               <span ref={cartButtonRef}>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="relative rounded-full border-zinc-300 px-3"
-                  onClick={openDrawer}
-                >
-                  <ShoppingBag />
-                  <span className="hidden text-sm font-medium text-black sm:inline">
-                    {formatCurrency(totalAmount)}
-                  </span>
-                  <span className="absolute -top-1 -right-1 inline-flex min-w-5 items-center justify-center rounded-full bg-black px-1.5 py-0.5 text-[11px] font-medium text-white">
-                    {itemCount}
-                  </span>
-                  <span className="sr-only">Abrir carrito</span>
-                </Button>
+                <ActionTooltip label="Abrir carrito">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="relative rounded-full border-zinc-300 px-3"
+                    onClick={openDrawer}
+                  >
+                    <ShoppingBag />
+                    <span className="hidden text-sm font-medium text-black sm:inline">
+                      {formatCurrency(totalAmount)}
+                    </span>
+                    <span className="absolute -top-1 -right-1 inline-flex min-w-5 items-center justify-center rounded-full bg-black px-1.5 py-0.5 text-[11px] font-medium text-white">
+                      {itemCount}
+                    </span>
+                    <span className="sr-only">Abrir carrito</span>
+                  </Button>
+                </ActionTooltip>
               </span>
             </nav>
           </div>
@@ -784,18 +795,20 @@ export function StoreHeader({ initialPromoBanner = null }: StoreHeaderProps) {
             : "pointer-events-none translate-y-4 opacity-0"
           }`}
       >
-        <Button
-          type="button"
-          size="icon"
-          className="relative size-12 rounded-full shadow-[0_16px_36px_rgba(0,0,0,0.14)]"
-          onClick={openDrawer}
-        >
-          <ShoppingBag />
-          <span className="absolute -top-1 -right-1 inline-flex min-w-5 items-center justify-center rounded-full bg-white px-1.5 py-0.5 text-[11px] font-medium text-black ring-1 ring-zinc-200">
-            {itemCount}
-          </span>
-          <span className="sr-only">Abrir carrito</span>
-        </Button>
+        <ActionTooltip label="Abrir carrito">
+          <Button
+            type="button"
+            size="icon"
+            className="relative size-12 rounded-full shadow-[0_16px_36px_rgba(0,0,0,0.14)]"
+            onClick={openDrawer}
+          >
+            <ShoppingBag />
+            <span className="absolute -top-1 -right-1 inline-flex min-w-5 items-center justify-center rounded-full bg-white px-1.5 py-0.5 text-[11px] font-medium text-black ring-1 ring-zinc-200">
+              {itemCount}
+            </span>
+            <span className="sr-only">Abrir carrito</span>
+          </Button>
+        </ActionTooltip>
       </div>
 
       {activeProduct ? (

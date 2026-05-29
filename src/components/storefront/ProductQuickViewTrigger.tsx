@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { ActionTooltip } from "@/components/ui/action-tooltip";
 import type { Product } from "@/types/domain";
 import { useProductGridQuickView } from "@/components/storefront/ProductGridCarouselClient";
 
@@ -20,12 +21,14 @@ export function ProductQuickViewTrigger({
   const { openProduct } = useProductGridQuickView();
 
   return (
-    <button
-      type="button"
-      onClick={() => openProduct(product, categoryName)}
-      className={className}
-    >
-      {children}
-    </button>
+    <ActionTooltip label="Ver detalle rapido">
+      <button
+        type="button"
+        onClick={() => openProduct(product, categoryName)}
+        className={className}
+      >
+        {children}
+      </button>
+    </ActionTooltip>
   );
 }

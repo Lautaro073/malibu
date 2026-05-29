@@ -31,6 +31,7 @@ export interface RawCategoryRecord {
   slug: string;
   createdAt?: FirebaseDateLike;
   updatedAt?: FirebaseDateLike;
+  deletedAt?: FirebaseDateLike;
 }
 
 export interface Category {
@@ -39,6 +40,8 @@ export interface Category {
   nombre_categoria: string;
   slug: string;
   created_at: string | null;
+  deleted_at: string | null;
+  is_deleted: boolean;
 }
 
 export interface RawProductRecord {
@@ -61,6 +64,7 @@ export interface RawProductRecord {
   imagePaths: string[];
   createdAt?: FirebaseDateLike;
   updatedAt?: FirebaseDateLike;
+  deletedAt?: FirebaseDateLike;
 }
 
 export interface Product {
@@ -86,6 +90,8 @@ export interface Product {
   image_paths?: string[];
   created_at: string | null;
   updated_at: string | null;
+  deleted_at: string | null;
+  is_deleted: boolean;
 }
 
 export interface ProductSearchResult {

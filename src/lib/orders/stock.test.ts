@@ -23,6 +23,8 @@ function product(overrides: Partial<Product>): Product {
     imagenes: [],
     created_at: null,
     updated_at: null,
+    deleted_at: null,
+    is_deleted: false,
     ...overrides,
   };
 }

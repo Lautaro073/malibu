@@ -163,6 +163,8 @@ interface UseAdminCatalogResult {
   submitProduct: (event: FormEvent<HTMLFormElement>) => void;
   requestCategoryDelete: (category: Category) => void;
   requestProductDelete: (product: Product) => void;
+  restoreCategory: (category: Category) => void;
+  restoreProduct: (product: Product) => void;
   updateOrderStatus: (orderId: string, status: "confirmed" | "cancelled") => void;
   closeDeleteDialog: () => void;
   confirmDelete: () => void;
@@ -262,7 +264,13 @@ export function useAdminCatalog(): UseAdminCatalogResult {
   const loadedUserIdRef = useRef("");
   const [isPending, startTransition] = useTransition();
   const [pendingAction, setPendingAction] = useState<
-    "category-submit" | "product-submit" | "logout" | `order:${string}` | null
+    | "category-submit"
+    | "product-submit"
+    | "logout"
+    | `order:${string}`
+    | `restore-category:${string}`
+    | `restore-product:${string}`
+    | null
   >(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [deleteError, setDeleteError] = useState("");
@@ -901,8 +909,8 @@ export function useAdminCatalog(): UseAdminCatalogResult {
               getResponseErrorMessage(
                 payload,
                 currentTarget.kind === "category"
-                  ? "No se pudo eliminar la categoria."
-                  : "No se pudo eliminar el producto."
+                  ? "No se pudo desactivar la categoria."
+                  : "No se pudo desactivar el producto."
               )
             );
           }
@@ -916,31 +924,117 @@ export function useAdminCatalog(): UseAdminCatalogResult {
           }
 
           if (currentTarget.kind === "category") {
-            setCategories((current) =>
-              current.filter((category) => category.id_categoria !== currentTarget.id)
-            );
+            if (!isCategory(payload)) {
+              throw new Error("La API devolvio una categoria invalida.");
+            }
+            setCategories((current) => upsertCategory(current, payload));
           } else {
-            setProducts((current) =>
-              current.filter((product) => product.id_producto !== currentTarget.id)
-            );
+            if (!isProduct(payload)) {
+              throw new Error("La API devolvio un producto invalido.");
+            }
+            setProducts((current) => upsertProduct(current, payload));
           }
 
           setDeleteTarget(null);
           setSuccess(
             currentTarget.kind === "category"
-              ? "Categoria eliminada correctamente."
-              : "Producto eliminado correctamente."
+              ? "Categoria desactivada correctamente."
+              : "Producto desactivado correctamente."
           );
         } catch (currentError: unknown) {
           setDeleteError(
             isErrorWithMessage(currentError)
               ? currentError.message
               : currentTarget.kind === "category"
-                ? "No se pudo eliminar la categoria."
-                : "No se pudo eliminar el producto."
+                ? "No se pudo desactivar la categoria."
+                : "No se pudo desactivar el producto."
           );
         } finally {
           setDeleteSubmitting(false);
+        }
+      })();
+    });
+  }
+
+  function restoreCategory(category: Category): void {
+    if (!auth) {
+      return;
+    }
+
+    setPendingAction(`restore-category:${category.id_categoria}`);
+
+    startTransition(() => {
+      void (async () => {
+        try {
+          const response = await authorizedFetch(auth, `/api/categorias/${category.id_categoria}`, {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ action: "restore" }),
+          });
+          const payload = await parseJson<unknown>(response);
+
+          if (!response.ok) {
+            throw new Error(getResponseErrorMessage(payload, "No se pudo reactivar la categoria."));
+          }
+
+          if (!isCategory(payload)) {
+            throw new Error("La API devolvio una categoria invalida.");
+          }
+
+          setCategories((current) => upsertCategory(current, payload));
+          setSuccess("Categoria reactivada correctamente.");
+        } catch (currentError: unknown) {
+          setFailure(
+            isErrorWithMessage(currentError)
+              ? currentError.message
+              : "No se pudo reactivar la categoria."
+          );
+        } finally {
+          setPendingAction(null);
+        }
+      })();
+    });
+  }
+
+  function restoreProduct(product: Product): void {
+    if (!auth) {
+      return;
+    }
+
+    setPendingAction(`restore-product:${product.id_producto}`);
+
+    startTransition(() => {
+      void (async () => {
+        try {
+          const response = await authorizedFetch(auth, `/api/productos/${product.id_producto}`, {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ action: "restore" }),
+          });
+          const payload = await parseJson<unknown>(response);
+
+          if (!response.ok) {
+            throw new Error(getResponseErrorMessage(payload, "No se pudo reactivar el producto."));
+          }
+
+          if (!isProduct(payload)) {
+            throw new Error("La API devolvio un producto invalido.");
+          }
+
+          setProducts((current) => upsertProduct(current, payload));
+          setSuccess("Producto reactivado correctamente.");
+        } catch (currentError: unknown) {
+          setFailure(
+            isErrorWithMessage(currentError)
+              ? currentError.message
+              : "No se pudo reactivar el producto."
+          );
+        } finally {
+          setPendingAction(null);
         }
       })();
     });
@@ -1076,6 +1170,8 @@ export function useAdminCatalog(): UseAdminCatalogResult {
     submitProduct,
     requestCategoryDelete,
     requestProductDelete,
+    restoreCategory,
+    restoreProduct,
     updateOrderStatus,
     closeDeleteDialog,
     confirmDelete,

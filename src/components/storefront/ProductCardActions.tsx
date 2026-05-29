@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Eye } from "lucide-react";
 import { AddToCartButton } from "@/components/storefront/AddToCartButton";
 import { ProductQuickViewTrigger } from "@/components/storefront/ProductQuickViewTrigger";
+import { ActionTooltip } from "@/components/ui/action-tooltip";
 import { buttonVariants } from "@/components/ui/button";
 import Link from "next/link";
 import { getProductHref } from "@/lib/storefront";
@@ -29,13 +30,15 @@ export function ProductCardActions({ product, categoryName, interactiveMode = "l
   const productHref = getProductHref(product);
 
   const viewButton = interactiveMode === "link" ? (
-    <Link
-      href={productHref}
-      className={buttonVariants({ variant: "outline", className: "flex-1" })}
-    >
-      <Eye className="mr-2 h-4 w-4" />
-      Ver
-    </Link>
+    <ActionTooltip label="Ver detalle de la prenda">
+      <Link
+        href={productHref}
+        className={buttonVariants({ variant: "outline", className: "flex-1" })}
+      >
+        <Eye className="mr-2 h-4 w-4" />
+        Ver
+      </Link>
+    </ActionTooltip>
   ) : (
     <ProductQuickViewTrigger
       product={product}
@@ -52,13 +55,15 @@ export function ProductCardActions({ product, categoryName, interactiveMode = "l
     if (hasMeasures && selectedMeasures.length === 0) {
       if (interactiveMode === "link") {
         return (
-          <Link
-            href={productHref}
-            className={buttonVariants({ variant: "default", className: "w-full" })}
-          >
-            <Eye className="mr-2 h-4 w-4" />
-            Ver prenda
-          </Link>
+          <ActionTooltip label="Ver detalle de la prenda">
+            <Link
+              href={productHref}
+              className={buttonVariants({ variant: "default", className: "w-full" })}
+            >
+              <Eye className="mr-2 h-4 w-4" />
+              Ver prenda
+            </Link>
+          </ActionTooltip>
         );
       }
       return (
@@ -95,26 +100,36 @@ export function ProductCardActions({ product, categoryName, interactiveMode = "l
               const isSelected = selectedMeasures.includes(variant.medida);
 
               return (
-                <button
+                <ActionTooltip
                   key={variant.medida}
-                  type="button"
-                  aria-pressed={isSelected}
-                  onClick={() =>
-                    setSelectedMeasures((current) =>
-                      toggleMeasureSelection(current, variant.medida)
-                    )
+                  label={
+                    variant.stock <= 0
+                      ? `Talle ${variant.medida} sin stock`
+                      : isSelected
+                        ? `Quitar talle ${variant.medida}`
+                        : `Elegir talle ${variant.medida}`
                   }
-                  disabled={variant.stock <= 0}
-                  className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
-                    isSelected
-                      ? "border-black bg-black text-white"
-                      : variant.stock <= 0
-                        ? "cursor-not-allowed border-zinc-200 bg-zinc-100 text-zinc-400"
-                        : "border-zinc-300 bg-white text-black hover:border-black"
-                  }`}
                 >
-                  {variant.medida}
-                </button>
+                  <button
+                    type="button"
+                    aria-pressed={isSelected}
+                    onClick={() =>
+                      setSelectedMeasures((current) =>
+                        toggleMeasureSelection(current, variant.medida)
+                      )
+                    }
+                    disabled={variant.stock <= 0}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                      isSelected
+                        ? "border-black bg-black text-white"
+                        : variant.stock <= 0
+                          ? "cursor-not-allowed border-zinc-200 bg-zinc-100 text-zinc-400"
+                          : "border-zinc-300 bg-white text-black hover:border-black"
+                    }`}
+                  >
+                    {variant.medida}
+                  </button>
+                </ActionTooltip>
               );
             })}
           </div>

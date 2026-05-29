@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   deleteCategory,
   getCategoryById,
+  restoreCategory,
   updateCategory,
 } from "@/lib/catalog/service";
 import { requireAdmin } from "@/lib/auth/admin";
@@ -47,10 +48,27 @@ export async function DELETE(request: Request, context: RouteContext<CategoryPar
   try {
     await requireAdmin(request);
     const { id } = await context.params;
-    await deleteCategory(id);
+    const categoria = await deleteCategory(id);
 
-    return NextResponse.json({ message: "Categoria eliminada correctamente" });
+    return NextResponse.json(categoria);
   } catch (error: unknown) {
-    return toErrorResponse(error, "Error al eliminar la categoria");
+    return toErrorResponse(error, "Error al desactivar la categoria");
+  }
+}
+
+export async function PATCH(request: Request, context: RouteContext<CategoryParams>) {
+  try {
+    await requireAdmin(request);
+    const { id } = await context.params;
+    const payload = (await request.json()) as Record<string, unknown>;
+
+    if (payload.action !== "restore") {
+      return NextResponse.json({ error: "Accion invalida" }, { status: 400 });
+    }
+
+    const categoria = await restoreCategory(id);
+    return NextResponse.json(categoria);
+  } catch (error: unknown) {
+    return toErrorResponse(error, "Error al reactivar la categoria");
   }
 }

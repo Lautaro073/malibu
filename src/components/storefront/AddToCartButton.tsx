@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { LoaderCircle, ShoppingBag } from "lucide-react";
 import { useStoreCart } from "@/components/storefront/StoreCartProvider";
+import { ActionTooltip } from "@/components/ui/action-tooltip";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -106,17 +107,19 @@ export function AddToCartButton({
           </Tooltip>
         </TooltipProvider>
       ) : (
-        <Button
-          type="button"
-          className={className}
-          disabled={isDisabled}
-          onClick={() => {
-            void handleAdd();
-          }}
-        >
-          {isSubmitting ? <LoaderCircle className="animate-spin" /> : <ShoppingBag />}
-          {isSubmitting ? "Agregando..." : idleLabel}
-        </Button>
+        <ActionTooltip label="Agregar al carrito">
+          <Button
+            type="button"
+            className={className}
+            disabled={isDisabled}
+            onClick={() => {
+              void handleAdd();
+            }}
+          >
+            {isSubmitting ? <LoaderCircle className="animate-spin" /> : <ShoppingBag />}
+            {isSubmitting ? "Agregando..." : idleLabel}
+          </Button>
+        </ActionTooltip>
       )}
     </div>
   );

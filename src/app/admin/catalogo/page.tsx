@@ -75,6 +75,7 @@ export default function AdminCatalogPage() {
               onCancel={admin.resetProductForm}
               onEdit={admin.beginProductEdit}
               onRequestDelete={admin.requestProductDelete}
+              onRestore={admin.restoreProduct}
             />
           }
           ordersContent={
@@ -96,6 +97,7 @@ export default function AdminCatalogPage() {
               onCancel={admin.resetCategoryForm}
               onEdit={admin.beginCategoryEdit}
               onRequestDelete={admin.requestCategoryDelete}
+              onRestore={admin.restoreCategory}
             />
           }
           settingsContent={

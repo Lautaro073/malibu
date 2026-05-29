@@ -33,7 +33,9 @@ export function isCategory(value: unknown): value is Category {
     isString(value.id_categoria) &&
     isString(value.nombre_categoria) &&
     isString(value.slug) &&
-    isNullableString(value.created_at)
+    isNullableString(value.created_at) &&
+    isNullableString(value.deleted_at) &&
+    typeof value.is_deleted === "boolean"
   );
 }
 
@@ -58,6 +60,8 @@ export function isProduct(value: unknown): value is Product {
     isProductVariantArray(value.variantes) &&
     isNullableString(value.imagen) &&
     isStringArray(value.imagenes) &&
+    isNullableString(value.deleted_at) &&
+    typeof value.is_deleted === "boolean" &&
     (value.image_path === undefined || isNullableString(value.image_path)) &&
     (value.image_paths === undefined || isStringArray(value.image_paths))
   );

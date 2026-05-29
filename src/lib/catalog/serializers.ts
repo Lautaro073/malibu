@@ -102,6 +102,8 @@ export function serializeCategory(category: RawCategoryRecord): Category {
     nombre_categoria: category.name || "",
     slug: category.slug || "",
     created_at: toIsoString(category.createdAt),
+    deleted_at: toIsoString(category.deletedAt),
+    is_deleted: Boolean(category.deletedAt),
   };
 }
 
@@ -138,6 +140,8 @@ export function serializeProduct(product: RawProductRecord): Product {
     image_paths: Array.isArray(product.imagePaths) ? product.imagePaths : [],
     created_at: toIsoString(product.createdAt),
     updated_at: toIsoString(product.updatedAt),
+    deleted_at: toIsoString(product.deletedAt),
+    is_deleted: Boolean(product.deletedAt),
   };
 }
 

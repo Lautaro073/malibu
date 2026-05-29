@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   deleteProduct,
   getProductById,
+  restoreProduct,
   updateProduct,
 } from "@/lib/catalog/service";
 import { requireAdmin } from "@/lib/auth/admin";
@@ -49,10 +50,27 @@ export async function DELETE(request: Request, context: RouteContext<ProductPara
   try {
     await requireAdmin(request);
     const { id } = await context.params;
-    await deleteProduct(id);
+    const producto = await deleteProduct(id);
 
-    return NextResponse.json({ message: "Producto eliminado correctamente" });
+    return NextResponse.json(producto);
   } catch (error: unknown) {
-    return toErrorResponse(error, "Error al eliminar el producto");
+    return toErrorResponse(error, "Error al desactivar el producto");
+  }
+}
+
+export async function PATCH(request: Request, context: RouteContext<ProductParams>) {
+  try {
+    await requireAdmin(request);
+    const { id } = await context.params;
+    const payload = (await request.json()) as Record<string, unknown>;
+
+    if (payload.action !== "restore") {
+      return NextResponse.json({ error: "Accion invalida" }, { status: 400 });
+    }
+
+    const producto = await restoreProduct(id);
+    return NextResponse.json(producto);
+  } catch (error: unknown) {
+    return toErrorResponse(error, "Error al reactivar el producto");
   }
 }

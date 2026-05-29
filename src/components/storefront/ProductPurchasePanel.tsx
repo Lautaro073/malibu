@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { AddToCartButton } from "@/components/storefront/AddToCartButton";
+import { ActionTooltip } from "@/components/ui/action-tooltip";
 import type { Product } from "@/types/domain";
 import { getProductVariants } from "@/lib/storefront";
 import { toggleMeasureSelection } from "@/lib/storefront/measure-selection";
@@ -38,26 +39,36 @@ export function ProductPurchasePanel({
               const isSelected = selectedMeasures.includes(variant.medida);
 
               return (
-                <button
+                <ActionTooltip
                   key={variant.medida}
-                  type="button"
-                  aria-pressed={isSelected}
-                  onClick={() =>
-                    setSelectedMeasures((current) =>
-                      toggleMeasureSelection(current, variant.medida)
-                    )
+                  label={
+                    variant.stock <= 0
+                      ? `Talle ${variant.medida} sin stock`
+                      : isSelected
+                        ? `Quitar talle ${variant.medida}`
+                        : `Elegir talle ${variant.medida}`
                   }
-                  disabled={variant.stock <= 0}
-                  className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
-                    isSelected
-                      ? "border-black bg-black text-white"
-                      : variant.stock <= 0
-                        ? "cursor-not-allowed border-zinc-200 bg-zinc-100 text-zinc-400"
-                        : "border-zinc-300 bg-white text-black hover:border-black"
-                  }`}
                 >
-                  {variant.medida}
-                </button>
+                  <button
+                    type="button"
+                    aria-pressed={isSelected}
+                    onClick={() =>
+                      setSelectedMeasures((current) =>
+                        toggleMeasureSelection(current, variant.medida)
+                      )
+                    }
+                    disabled={variant.stock <= 0}
+                    className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
+                      isSelected
+                        ? "border-black bg-black text-white"
+                        : variant.stock <= 0
+                          ? "cursor-not-allowed border-zinc-200 bg-zinc-100 text-zinc-400"
+                          : "border-zinc-300 bg-white text-black hover:border-black"
+                    }`}
+                  >
+                    {variant.medida}
+                  </button>
+                </ActionTooltip>
               );
             })}
           </div>

@@ -11,7 +11,6 @@ import { serializeCategory, serializeProduct } from "@/lib/catalog/serializers";
 import type {
   Category,
   CategoryWithProducts,
-  DeleteResponse,
   FirebaseDateLike,
   Product,
   ProductMeasureType,
@@ -107,10 +106,15 @@ interface CloudinaryDestroyResponse {
 interface ProductListOptions {
   limit?: number;
   offset?: number;
+  includeDeleted?: boolean;
 }
 
 interface SearchProductsOptions {
   limit?: number;
+}
+
+interface CatalogListOptions {
+  includeDeleted?: boolean;
 }
 
 const CATEGORY_CACHE_TAG = "catalog:categories";
@@ -330,6 +334,27 @@ function sortByCreatedAtDesc<T extends { createdAt?: FirebaseDateLike }>(items: 
   );
 }
 
+function isActiveCatalogRecord(item: { deletedAt?: FirebaseDateLike }): boolean {
+  return !item.deletedAt;
+}
+
+function getActiveCategoryIds(categories: RawCategoryRecord[]): Set<string> {
+  return new Set(categories.filter(isActiveCatalogRecord).map((category) => category.id));
+}
+
+function filterActiveProducts(
+  products: RawProductRecord[],
+  activeCategoryIds: Set<string>
+): RawProductRecord[] {
+  return products.filter((product) => {
+    if (!isActiveCatalogRecord(product)) {
+      return false;
+    }
+
+    return !product.categoryId || activeCategoryIds.has(product.categoryId);
+  });
+}
+
 function slugify(value: unknown): string {
   return safeString(value)
     .normalize("NFD")
@@ -519,6 +544,7 @@ function toRawCategoryRecord(id: string, data: DocumentData): RawCategoryRecord 
     slug: safeString(data.slug),
     createdAt: readDateField(data, "createdAt"),
     updatedAt: readDateField(data, "updatedAt"),
+    deletedAt: readDateField(data, "deletedAt"),
   };
 }
 
@@ -548,6 +574,7 @@ function toRawProductRecord(id: string, data: DocumentData): RawProductRecord {
     imagePaths: imagePaths.length > 0 ? imagePaths : (fallbackImagePath ? [fallbackImagePath] : []),
     createdAt: readDateField(data, "createdAt"),
     updatedAt: readDateField(data, "updatedAt"),
+    deletedAt: readDateField(data, "deletedAt"),
   };
 }
 
@@ -613,11 +640,16 @@ async function getCategoryRawByIdentifier(identifier: string): Promise<RawCatego
 
   if (!slugSnapshot.empty) {
     const firstDoc = slugSnapshot.docs[0];
-    return toRawCategoryRecord(firstDoc.id, firstDoc.data() ?? {});
+    const category = toRawCategoryRecord(firstDoc.id, firstDoc.data() ?? {});
+    return isActiveCatalogRecord(category) ? category : null;
   }
 
   const categories = await readCategoriesRaw();
-  return categories.find((category) => normalizeText(category.name) === normalizedIdentifier) || null;
+  return categories.find(
+    (category) =>
+      isActiveCatalogRecord(category) &&
+      normalizeText(category.name) === normalizedIdentifier
+  ) || null;
 }
 
 async function getCategoryDocById(id: string): Promise<RawCategoryRecord | null> {
@@ -637,6 +669,10 @@ async function ensureCategoryExists(categoryId: string): Promise<RawCategoryReco
 
   if (!category) {
     throw createHttpError(404, "Categoria no encontrada.");
+  }
+
+  if (!isActiveCatalogRecord(category)) {
+    throw createHttpError(409, "La categoria esta desactivada. Reactivala antes de usarla.");
   }
 
   return category;
@@ -833,17 +869,20 @@ async function deleteProductImages(imagePaths: string[]): Promise<void> {
   await Promise.all(imagePaths.map((imagePath) => deleteProductImage(imagePath)));
 }
 
-export async function listCategories(): Promise<Category[]> {
+export async function listCategories(
+  { includeDeleted = false }: CatalogListOptions = {}
+): Promise<Category[]> {
   const categories = await readCategoriesRaw();
 
   return categories
+    .filter((category) => includeDeleted || isActiveCatalogRecord(category))
     .sort((a, b) => safeString(a.name).localeCompare(safeString(b.name), "es"))
     .map(serializeCategory);
 }
 
 export async function getCategoryById(id: string): Promise<Category | null> {
   const category = await getCategoryDocById(id);
-  return category ? serializeCategory(category) : null;
+  return category && isActiveCatalogRecord(category) ? serializeCategory(category) : null;
 }
 
 export async function createCategory(input: CategoryInput): Promise<Category> {
@@ -896,27 +935,62 @@ export async function updateCategory(
   });
 }
 
-export async function deleteCategory(id: string): Promise<DeleteResponse> {
+export async function deleteCategory(id: string): Promise<Category> {
   const db = getFirebaseAdminDb();
   const [category, linkedProductsSnapshot] = await Promise.all([
     getCategoryDocById(id),
-    db.collection("products").where("categoryId", "==", id).limit(1).get(),
+    db.collection("products").where("categoryId", "==", id).get(),
   ]);
 
   if (!category) {
     throw createHttpError(404, "Categoria no encontrada.");
   }
 
-  if (!linkedProductsSnapshot.empty) {
+  const hasActiveProducts = linkedProductsSnapshot.docs.some((doc) =>
+    isActiveCatalogRecord(toRawProductRecord(doc.id, doc.data() ?? {}))
+  );
+
+  if (hasActiveProducts) {
     throw createHttpError(
       409,
-      "No se puede eliminar la categoria porque tiene prendas asociadas."
+      "No se puede desactivar la categoria porque tiene prendas activas."
     );
   }
 
-  await db.collection("categories").doc(id).delete();
+  const deletedAt = new Date();
+  await db.collection("categories").doc(id).update({
+    deletedAt,
+    updatedAt: deletedAt,
+  });
+
   revalidateCatalogCache();
-  return { deleted: true };
+  return serializeCategory({
+    ...category,
+    deletedAt,
+    updatedAt: deletedAt,
+  });
+}
+
+export async function restoreCategory(id: string): Promise<Category> {
+  const db = getFirebaseAdminDb();
+  const category = await getCategoryDocById(id);
+
+  if (!category) {
+    throw createHttpError(404, "Categoria no encontrada.");
+  }
+
+  const updatedAt = new Date();
+  await db.collection("categories").doc(id).update({
+    deletedAt: null,
+    updatedAt,
+  });
+
+  revalidateCatalogCache();
+  return serializeCategory({
+    ...category,
+    deletedAt: null,
+    updatedAt,
+  });
 }
 
 export async function getCategoryProductsByName(
@@ -928,7 +1002,9 @@ export async function getCategoryProductsByName(
     return null;
   }
 
-  return sortByCreatedAtDesc(await readProductsByCategoryRaw(category.id)).map(serializeProduct);
+  return sortByCreatedAtDesc(
+    (await readProductsByCategoryRaw(category.id)).filter(isActiveCatalogRecord)
+  ).map(serializeProduct);
 }
 
 export async function listProductsByCategoryId(categoryId: string): Promise<Product[]> {
@@ -936,7 +1012,15 @@ export async function listProductsByCategoryId(categoryId: string): Promise<Prod
     return [];
   }
 
-  return sortByCreatedAtDesc(await readProductsByCategoryRaw(categoryId)).map(serializeProduct);
+  const category = await getCategoryDocById(categoryId);
+
+  if (!category || !isActiveCatalogRecord(category)) {
+    return [];
+  }
+
+  return sortByCreatedAtDesc(
+    (await readProductsByCategoryRaw(categoryId)).filter(isActiveCatalogRecord)
+  ).map(serializeProduct);
 }
 
 export async function listCategoriesWithProducts(): Promise<CategoryWithProducts[]> {
@@ -945,9 +1029,13 @@ export async function listCategoriesWithProducts(): Promise<CategoryWithProducts
     readProductsRaw(),
   ]);
 
-  const serializedProducts = sortByCreatedAtDesc(products).map(serializeProduct);
+  const activeCategories = categories.filter(isActiveCatalogRecord);
+  const activeCategoryIds = getActiveCategoryIds(categories);
+  const serializedProducts = sortByCreatedAtDesc(
+    filterActiveProducts(products, activeCategoryIds)
+  ).map(serializeProduct);
 
-  return categories
+  return activeCategories
     .sort((a, b) => safeString(a.name).localeCompare(safeString(b.name), "es"))
     .map((category) => {
       const serializedCategory = serializeCategory(category);
@@ -962,9 +1050,17 @@ export async function listCategoriesWithProducts(): Promise<CategoryWithProducts
 }
 
 export async function listProducts(
-  { limit = 15, offset = 0 }: ProductListOptions = {}
+  { limit = 15, offset = 0, includeDeleted = false }: ProductListOptions = {}
 ): Promise<Product[]> {
-  const products = sortByCreatedAtDesc(await readProductsRaw());
+  const [productsRaw, categoriesRaw] = await Promise.all([
+    readProductsRaw(),
+    readCategoriesRaw(),
+  ]);
+  const products = sortByCreatedAtDesc(
+    includeDeleted
+      ? productsRaw
+      : filterActiveProducts(productsRaw, getActiveCategoryIds(categoriesRaw))
+  );
   const normalizedOffset = Number.isFinite(offset) && offset > 0 ? Math.trunc(offset) : 0;
   const normalizedLimit = normalizeLimit(limit, 15);
 
@@ -973,8 +1069,19 @@ export async function listProducts(
     .map(serializeProduct);
 }
 
-export async function listAllProducts(): Promise<Product[]> {
-  return sortByCreatedAtDesc(await readProductsRaw()).map(serializeProduct);
+export async function listAllProducts(
+  { includeDeleted = false }: CatalogListOptions = {}
+): Promise<Product[]> {
+  const [productsRaw, categoriesRaw] = await Promise.all([
+    readProductsRaw(),
+    readCategoriesRaw(),
+  ]);
+
+  return sortByCreatedAtDesc(
+    includeDeleted
+      ? productsRaw
+      : filterActiveProducts(productsRaw, getActiveCategoryIds(categoriesRaw))
+  ).map(serializeProduct);
 }
 
 export async function listRelatedProducts(
@@ -988,8 +1095,14 @@ export async function listRelatedProducts(
 
   const normalizedLimit = normalizeLimit(limit, 4);
 
+  const category = await getCategoryDocById(categoryId);
+
+  if (!category || !isActiveCatalogRecord(category)) {
+    return [];
+  }
+
   return sortByCreatedAtDesc(await readProductsByCategoryRaw(categoryId))
-    .filter((product) => product.id !== productId)
+    .filter((product) => product.id !== productId && isActiveCatalogRecord(product))
     .slice(0, normalizedLimit)
     .map(serializeProduct);
 }
@@ -1005,7 +1118,13 @@ export async function searchProducts(
   }
 
   const normalizedLimit = normalizeLimit(limit, 6);
-  const products = sortByCreatedAtDesc(await readProductsRaw());
+  const [productsRaw, categoriesRaw] = await Promise.all([
+    readProductsRaw(),
+    readCategoriesRaw(),
+  ]);
+  const products = sortByCreatedAtDesc(
+    filterActiveProducts(productsRaw, getActiveCategoryIds(categoriesRaw))
+  );
 
   return products
     .filter((product) => normalizeText(product.name).includes(normalizedTerm))
@@ -1015,7 +1134,19 @@ export async function searchProducts(
 
 export async function getProductById(id: string): Promise<Product | null> {
   const product = (await readProductsRaw()).find((item) => item.id === id) ?? null;
-  return product ? serializeProduct(product) : null;
+  if (!product || !isActiveCatalogRecord(product)) {
+    return null;
+  }
+
+  if (product.categoryId) {
+    const category = await getCategoryDocById(product.categoryId);
+
+    if (!category || !isActiveCatalogRecord(category)) {
+      return null;
+    }
+  }
+
+  return serializeProduct(product);
 }
 
 export async function createProduct(
@@ -1147,7 +1278,7 @@ export async function updateProduct(
   });
 }
 
-export async function deleteProduct(id: string): Promise<DeleteResponse> {
+export async function deleteProduct(id: string): Promise<Product> {
   const db = getFirebaseAdminDb();
   const existing = await getProductDocById(id);
 
@@ -1155,14 +1286,44 @@ export async function deleteProduct(id: string): Promise<DeleteResponse> {
     throw createHttpError(404, "Producto no encontrado.");
   }
 
-  await db.collection("products").doc(id).delete();
-
-  if (existing.imagePaths.length > 0) {
-    await deleteProductImages(existing.imagePaths);
-  }
+  const deletedAt = new Date();
+  await db.collection("products").doc(id).update({
+    deletedAt,
+    updatedAt: deletedAt,
+  });
 
   revalidateCatalogCache();
-  return { deleted: true };
+  return serializeProduct({
+    ...existing,
+    deletedAt,
+    updatedAt: deletedAt,
+  });
+}
+
+export async function restoreProduct(id: string): Promise<Product> {
+  const db = getFirebaseAdminDb();
+  const existing = await getProductDocById(id);
+
+  if (!existing) {
+    throw createHttpError(404, "Producto no encontrado.");
+  }
+
+  if (existing.categoryId) {
+    await ensureCategoryExists(existing.categoryId);
+  }
+
+  const updatedAt = new Date();
+  await db.collection("products").doc(id).update({
+    deletedAt: null,
+    updatedAt,
+  });
+
+  revalidateCatalogCache();
+  return serializeProduct({
+    ...existing,
+    deletedAt: null,
+    updatedAt,
+  });
 }
 
 export async function getProductStockById(
@@ -1248,7 +1409,13 @@ export const getPromoBannerSettings = unstable_cache(
 
 export async function getProductsByTag(tag: string): Promise<Product[]> {
   const normalizedTag = normalizeText(tag);
-  const products = sortByCreatedAtDesc(await readProductsRaw());
+  const [productsRaw, categoriesRaw] = await Promise.all([
+    readProductsRaw(),
+    readCategoriesRaw(),
+  ]);
+  const products = sortByCreatedAtDesc(
+    filterActiveProducts(productsRaw, getActiveCategoryIds(categoriesRaw))
+  );
 
   return products
     .filter((product) => normalizeText(product.tag) === normalizedTag)
