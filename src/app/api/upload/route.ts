@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "node:crypto";
+import { MAX_PRODUCT_IMAGE_SIZE_BYTES } from "@/lib/catalog/constants";
 
 function requiredEnv(name: string): string {
   const value = process.env[name];
@@ -15,6 +16,20 @@ export async function POST(request: NextRequest) {
     const file = formData.get("file") as File | null;
     if (!file) {
       return NextResponse.json({ error: "No se proporcionó ningún archivo" }, { status: 400 });
+    }
+
+    if (!file.type || !file.type.startsWith("image/")) {
+      return NextResponse.json(
+        { error: "El archivo debe ser una imagen valida." },
+        { status: 400 }
+      );
+    }
+
+    if (file.size > MAX_PRODUCT_IMAGE_SIZE_BYTES) {
+      return NextResponse.json(
+        { error: "La imagen debe pesar como maximo 8 MB." },
+        { status: 400 }
+      );
     }
 
     const cloudName = requiredEnv("CLOUDINARY_CLOUD_NAME");

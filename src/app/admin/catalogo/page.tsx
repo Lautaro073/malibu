@@ -81,6 +81,7 @@ export default function AdminCatalogPage() {
           ordersContent={
             <OrdersPanel
               orders={admin.orders}
+              products={admin.products}
               orderSubmittingId={admin.orderSubmittingId}
               onUpdateStatus={admin.updateOrderStatus}
             />

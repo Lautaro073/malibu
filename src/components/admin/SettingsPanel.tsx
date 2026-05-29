@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { LoaderCircle, Megaphone, Images, Save, Upload, Trash2, Plus } from "lucide-react";
 import { ActionTooltip } from "@/components/ui/action-tooltip";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { MAX_PRODUCT_IMAGE_SIZE_BYTES } from "@/lib/catalog/constants";
 import { toast } from "sonner";
 
 interface SlideConfig {
@@ -180,6 +182,18 @@ export function SettingsPanel() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (!file.type.startsWith("image/")) {
+      toast.error("El archivo debe ser una imagen.");
+      e.target.value = "";
+      return;
+    }
+
+    if (file.size > MAX_PRODUCT_IMAGE_SIZE_BYTES) {
+      toast.error("La imagen debe pesar como maximo 8 MB.");
+      e.target.value = "";
+      return;
+    }
+
     setUploadingIndex(index);
     setError("");
     try {
@@ -204,6 +218,7 @@ export function SettingsPanel() {
       toast.error("No se pudo subir la foto de campaña. Intentalo de nuevo.");
     } finally {
       setUploadingIndex(null);
+      e.target.value = "";
     }
   };
 
@@ -381,10 +396,12 @@ export function SettingsPanel() {
                           
                           {isFirst ? (
                             <div className="relative rounded-lg border border-zinc-200 bg-zinc-50 p-2 flex items-center gap-3">
-                              <img 
+                              <Image
                                 src="/assets/malibu.jpg" 
                                 alt="Previsualización Malibú" 
-                                className="size-14 rounded object-cover border border-zinc-300" 
+                                width={56}
+                                height={56}
+                                className="size-14 rounded border border-zinc-300 object-cover"
                               />
                               <div className="flex-1 min-w-0">
                                 <p className="text-xs text-zinc-700 font-medium">Foto corporativa fija (Malibú)</p>
@@ -393,10 +410,13 @@ export function SettingsPanel() {
                             </div>
                           ) : slide.image ? (
                             <div className="relative rounded-lg border border-zinc-200 bg-zinc-50 p-2 flex items-center gap-3">
-                              <img 
+                              <Image
                                 src={slide.image} 
                                 alt={`Previsualización Imagen ${index + 1}`} 
-                                className="size-14 rounded object-cover border border-zinc-300" 
+                                width={56}
+                                height={56}
+                                unoptimized
+                                className="size-14 rounded border border-zinc-300 object-cover"
                               />
                               <div className="flex-1 min-w-0">
                                 <p className="text-xs text-zinc-500 truncate">{slide.image}</p>

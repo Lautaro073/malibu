@@ -10,12 +10,14 @@ import {
   getDefaultAdminOrderStatusFilter,
   type AdminOrderStatusFilter,
 } from "@/lib/orders/filters";
+import { getOrderStockWarnings } from "@/lib/orders/stock-availability";
 import { formatCurrency } from "@/lib/storefront";
 import { useEffect, useMemo, useState } from "react";
-import type { OrderSummary } from "@/types/domain";
+import type { OrderSummary, Product } from "@/types/domain";
 
 interface OrdersPanelProps {
   orders: OrderSummary[];
+  products: Product[];
   orderSubmittingId: string;
   onUpdateStatus: (orderId: string, status: "confirmed" | "cancelled") => void;
 }
@@ -102,7 +104,12 @@ function getFilterEmptyMessage(status: AdminOrderStatusFilter): string {
   return "No hay pedidos cancelados.";
 }
 
-export function OrdersPanel({ orders, orderSubmittingId, onUpdateStatus }: OrdersPanelProps) {
+export function OrdersPanel({
+  orders,
+  products,
+  orderSubmittingId,
+  onUpdateStatus,
+}: OrdersPanelProps) {
   const pendingCount = orders.filter((order) => order.status === "pending_confirmation").length;
   const confirmedCount = orders.filter((order) => order.status === "confirmed").length;
   const cancelledCount = orders.filter((order) => order.status === "cancelled").length;
@@ -222,6 +229,8 @@ export function OrdersPanel({ orders, orderSubmittingId, onUpdateStatus }: Order
             {filteredOrders.map((order) => {
               const isSubmitting = orderSubmittingId === order.id_orden;
               const isPending = order.status === "pending_confirmation";
+              const stockWarnings = getOrderStockWarnings(order, products);
+              const hasStockWarnings = stockWarnings.length > 0;
 
               return (
                 <article
@@ -272,6 +281,17 @@ export function OrdersPanel({ orders, orderSubmittingId, onUpdateStatus }: Order
                   </div>
 
                   <div className="border-t border-zinc-200 px-4 py-4">
+                    {hasStockWarnings ? (
+                      <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-3 text-sm text-amber-950">
+                        <p className="font-semibold">Revisar stock antes de confirmar</p>
+                        <ul className="mt-2 list-disc space-y-1 pl-5">
+                          {stockWarnings.map((warning) => (
+                            <li key={warning.itemKey}>{warning.message}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+
                     <div className="flex items-center justify-between gap-3 text-base font-semibold text-black">
                       <span>Total</span>
                       <span>{formatCurrency(order.pricing.total ?? order.pricing.subtotal)}</span>
@@ -279,12 +299,18 @@ export function OrdersPanel({ orders, orderSubmittingId, onUpdateStatus }: Order
 
                     {isPending ? (
                       <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                        <ActionTooltip label="Confirmar y descontar stock">
+                        <ActionTooltip
+                          label={
+                            hasStockWarnings
+                              ? "Ajusta el stock antes de confirmar"
+                              : "Confirmar y descontar stock"
+                          }
+                        >
                           <Button
                             type="button"
                             className="h-11 w-full"
                             onClick={() => onUpdateStatus(order.id_orden, "confirmed")}
-                            disabled={isSubmitting}
+                            disabled={isSubmitting || hasStockWarnings}
                           >
                             <Check className="size-4" />
                             Confirmar pedido
