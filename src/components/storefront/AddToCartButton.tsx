@@ -52,7 +52,7 @@ export function AddToCartButton({
   const disabledReason = !isReady
     ? "Preparando carrito..."
     : missingMeasure
-      ? "Elige un talle antes de anadir al carrito."
+      ? "Elige un talle antes de añadir al carrito."
     : stock <= 0 && selectedMeasureList.length === 0
       ? "Este producto no tiene stock."
       : stockReached
@@ -67,8 +67,8 @@ export function AddToCartButton({
         : stockReached
           ? "Sin stock"
           : selectedMeasureList.length > 1
-            ? `Anadir ${selectedMeasureList.length} talles`
-            : "Anadir al carrito";
+            ? `Añadir ${selectedMeasureList.length} talles`
+            : "Añadir al carrito";
 
   async function handleAdd(): Promise<void> {
     try {

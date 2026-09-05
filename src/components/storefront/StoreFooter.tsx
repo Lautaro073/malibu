@@ -130,14 +130,18 @@ export async function StoreFooter() {
           <div className="space-y-1">
             <p>
               Copyright {currentYear}{" "}
-              <a
-                href="https://www.instagram.com/malibu.collection/"
-                target="_blank"
-                rel="noreferrer"
-                className="font-medium text-zinc-700 transition hover:text-black"
-              >
-                Malibú
-              </a>
+              {instagramUrl ? (
+                <a
+                  href={instagramUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-medium text-zinc-700 transition hover:text-black"
+                >
+                  Malibú
+                </a>
+              ) : (
+                <span className="font-medium text-zinc-700">Malibú</span>
+              )}
               . Todos los derechos reservados.
             </p>
           </div>
